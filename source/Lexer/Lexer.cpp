@@ -324,23 +324,20 @@ std::string Lexer::UnitTest_TokensToCode(const std::vector<Token> tokens)
     for (size_t i = 0; i < tokens.size(); i++)
     {
         Token token = tokens[i];
-        ss << token.value;
 
-        if (token.value == ";")
-            ss << std::endl;
-        else if (token.value == ",")
-        {
-            ss << " ";
-        }
-        else if (token.type != Token_Type::TOKEN_TYPE_SEPERATOR)
-        {
-            Token nextToken = tokens[i + 1];
+        std::string type = "invalid";
+        if (token.type == Token_Type::TOKEN_TYPE_IDENTIFIER)
+            type = "identifier";
+        else if (token.type == Token_Type::TOKEN_TYPE_STRING)
+            type = "string";
+        else if (token.type == Token_Type::TOKEN_TYPE_NUMERIC)
+            type = "numeric";
+        else if (token.type == Token_Type::TOKEN_TYPE_OPERATOR)
+            type = "operator";
+        else if (token.type == Token_Type::TOKEN_TYPE_SEPERATOR)
+            type = "seperator";
 
-            if (nextToken.type == Token_Type::TOKEN_TYPE_SEPERATOR)
-                continue;
-
-            ss << " ";
-        }
+        ss << "[" << type << " (" << token.value << ")] ";
     }
 
     return ss.str();
