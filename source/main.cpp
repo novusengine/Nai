@@ -5,7 +5,7 @@
 
 int main()
 {
-    /*FILE* file = nullptr;
+    FILE* file = nullptr;
     fopen_s(&file, "text.nai", "r");
     if (file)
     {
@@ -26,9 +26,9 @@ int main()
         }
 
         fclose(file);
-    }*/
+    }
 
-    auto tokens = Lexer::UnitTest("[identifier (int)] [identifier (myInt)][operator (=)] [literal (5)] [seperator(;)]");
+    //auto tokens = Lexer::UnitTest("[identifier (int)] [identifier (myInt)][operator (=)] [literal (5)] [seperator(;)]");
 
     return 0;
 }

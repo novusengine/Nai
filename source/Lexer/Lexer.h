@@ -12,6 +12,8 @@ public:
     void Init(char* inBuffer, long size);
     void Process();
 
+    Token_Type ResolveTokenType(std::string& input);
+
     // This function expects to start at a minimum of 1 position after the first "/"
     void ResolveMultilineComment(long& bufferPos);
     long SkipWhitespaceOrNewline(long bufferPos = defaultBufferPosition);

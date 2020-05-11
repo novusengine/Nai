@@ -38,6 +38,38 @@ void Lexer::Process()
     ProcessTokens();
 }
 
+Token_Type Lexer::ResolveTokenType(std::string& input)
+{
+    Token_Type type = Token_Type::TOKEN_TYPE_IDENTIFIER;
+
+    if (input[0] == '"')
+    {
+        input.erase(std::remove_if(input.begin(), input.end(), isspace), input.end());
+        type = Token_Type::TOKEN_TYPE_STRING;
+    }
+    else
+    {
+        // Check if value is numeric
+        try
+        {
+            std::stoll(input);
+            type = Token_Type::TOKEN_TYPE_NUMERIC;
+        }
+        catch (std::exception) {}
+
+        if (type != Token_Type::TOKEN_TYPE_NUMERIC)
+        {
+            try
+            {
+                std::stod(input);
+                type = Token_Type::TOKEN_TYPE_NUMERIC;
+            }
+            catch (std::exception) {}
+        }
+    }
+    return type;
+}
+
 void Lexer::ResolveMultilineComment(long& bufferPos)
 {
     while (bufferPos < bufferSize)
@@ -148,7 +180,7 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
                 token.lineNum = lineNum;
                 token.charNum = charNum;
                 token.value = tokenStr;
-                token.type = Token_Type::TOKEN_TYPE_IDENTIFIER;
+                token.type = ResolveTokenType(tokenStr);
                 tokens.push_back(token);
             }
 
@@ -172,7 +204,7 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
         token.lineNum = lineNum;
         token.charNum = charNum;
         token.value = tokenStr;
-        token.type = Token_Type::TOKEN_TYPE_IDENTIFIER;
+        token.type = ResolveTokenType(tokenStr);
         tokens.push_back(token);
     }
 
@@ -258,9 +290,13 @@ std::vector<Token> Lexer::UnitTest(std::string input)
         {
             token.type = Token_Type::TOKEN_TYPE_IDENTIFIER;
         }
-        else if (type == "literal")
+        else if (type == "string")
         {
-            token.type = Token_Type::TOKEN_TYPE_LITERAL;
+            token.type = Token_Type::TOKEN_TYPE_STRING;
+        }
+        else if (type == "numeric")
+        {
+            token.type = Token_Type::TOKEN_TYPE_NUMERIC;
         }
         else if (type == "operator")
         {
