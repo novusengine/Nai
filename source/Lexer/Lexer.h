@@ -22,6 +22,8 @@ public:
     void ExtractTokens(long bufferPos = defaultBufferPosition);
     void ProcessTokens();
 
+    // Unit Test
+    static std::vector<Token> UnitTest(std::string input);
 private:
     const static int defaultBufferPosition = -1;
     char* buffer;

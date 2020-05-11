@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "Lexer.h"
+#include "Utils/StringUtils.h"
 
 void Lexer::Init(char* inBuffer, long size)
 {
@@ -34,72 +35,7 @@ void Lexer::Init(char* inBuffer, long size)
 
 void Lexer::Process()
 {
-    for (bufferPosition = 0; bufferPosition < bufferSize;)
-    {
-        ProcessTokens();
-
-        /*auto seperator_itr = charToTypeMap.find(c);
-        if (seperator_itr != seperators.end())
-        {
-            Token lToken;
-            lToken.type = Token_Type::TOKEN_TYPE_SEPERATOR;
-            lToken.value = c;
-            lToken.line = lineCount;
-            tokens.push_back(lToken);
-        }
-        else if (c == '"')
-        {
-            Token lToken;
-            lToken.type = Token_Type::TOKEN_TYPE_LITERAL;
-            lToken.line = lineCount;
-
-            std::string result = "";
-
-            i += 1;
-            while (i < bufferSize)
-            {
-                if (buffer[i] == '"')
-                {
-                    break;
-                }
-
-                result += buffer[i];
-                i += 1;
-            }
-
-            lToken.value = result;
-            tokens.push_back(lToken);
-        }
-        else if (isalnum(c))
-        {
-            Token lToken;
-            lToken.type = isalpha(c) ? Token_Type::TOKEN_TYPE_IDENTIFIER : Token_Type::TOKEN_TYPE_LITERAL;
-            lToken.line = lineCount;
-
-            std::string result = "";
-            while (i < bufferSize)
-            {
-                result += buffer[i];
-
-                if (lToken.type == Token_Type::TOKEN_TYPE_IDENTIFIER)
-                {
-                    char tmp = buffer[i + 1];
-                    if (!isalnum(tmp) && tmp != '_')
-                        break;
-                }
-                else
-                {
-                    if (!isdigit(buffer[i + 1]))
-                        break;
-                }
-
-                i += 1;
-            }
-
-            lToken.value = result;
-            tokens.push_back(lToken);
-        }*/
-    }
+    ProcessTokens();
 }
 
 void Lexer::ResolveMultilineComment(long& bufferPos)
@@ -245,15 +181,102 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
 
 void Lexer::ProcessTokens()
 {
-    long bufferPos = SkipWhitespaceOrNewline(defaultBufferPosition);
-    long lastBufferPos = 0;
-    
-    do
+    for (bufferPosition = 0; bufferPosition < bufferSize;)
     {
-        SkipComment(bufferPos);
-        lastBufferPos = bufferPos;
-        bufferPos = SkipWhitespaceOrNewline(bufferPos);
-    } while (bufferPos != lastBufferPos);
+        long bufferPos = SkipWhitespaceOrNewline(defaultBufferPosition);
+        long lastBufferPos = 0;
 
-    ExtractTokens(bufferPos);
+        do
+        {
+            SkipComment(bufferPos);
+            lastBufferPos = bufferPos;
+            bufferPos = SkipWhitespaceOrNewline(bufferPos);
+        } while (bufferPos != lastBufferPos);
+
+        ExtractTokens(bufferPos);
+    }
+}
+
+std::vector<Token> Lexer::UnitTest(std::string input)
+{
+    std::vector<Token> tokens;
+
+    auto splitStr = StringUtils::Split(input, ']');
+    for (std::string string : splitStr)
+    {
+        string.erase(std::remove_if(string.begin(), string.end(), isspace), string.end());
+
+        // We expect a "[--- (name)]" Format, if we don't immediately see a bracket we will ignore
+        if (string[0] != '[')
+            continue;
+
+        std::stringstream ss;
+        size_t nameIndex = 1;
+        for (size_t i = 1; i < string.size(); i++)
+        {
+            char tmp = string[i];
+            if (tmp == '(')
+            {
+                nameIndex = i;
+                break;
+            }
+
+            ss << tmp;
+        }
+
+        // If no type was found, continue;
+        if (ss.str().size() == 0)
+            continue;
+
+        std::string type = ss.str();
+        ss.str("");
+        ss.clear();
+
+        for (size_t i = nameIndex; string.size(); i++)
+        {
+            char tmp = string[i];
+
+            if (tmp == '(')
+                continue;
+
+            if (tmp == ')')
+                break;
+
+            ss << tmp;
+        }
+
+        // If no name was found, continue;
+        if (ss.str().size() == 0)
+            continue;
+
+        Token token;
+        token.lineNum = 0;
+        token.charNum = 0;
+        token.value = ss.str();
+
+        if (type == "identifier")
+        {
+            token.type = Token_Type::TOKEN_TYPE_IDENTIFIER;
+        }
+        else if (type == "literal")
+        {
+            token.type = Token_Type::TOKEN_TYPE_LITERAL;
+        }
+        else if (type == "operator")
+        {
+            token.type = Token_Type::TOKEN_TYPE_OPERATOR;
+        }
+        else if (type == "seperator")
+        {
+            token.type = Token_Type::TOKEN_TYPE_SEPERATOR;
+        }
+        else
+        {
+            token.type = Token_Type::TOKEN_TYPE_INVALID;
+        }
+
+        tokens.push_back(token);
+    }
+
+    return tokens;
 }
