@@ -44,7 +44,7 @@ Token_Type Lexer::ResolveTokenType(std::string& input)
 
     if (input[0] == '"')
     {
-        input.erase(std::remove_if(input.begin(), input.end(), isspace), input.end());
+        input.erase(std::remove(input.begin(), input.end(), '"'), input.end());
         type = Token_Type::TOKEN_TYPE_STRING;
     }
     else
@@ -179,8 +179,8 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
                 Token token;
                 token.lineNum = lineNum;
                 token.charNum = charNum;
-                token.value = tokenStr;
                 token.type = ResolveTokenType(tokenStr);
+                token.value = tokenStr;
                 tokens.push_back(token);
             }
 
@@ -203,8 +203,8 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
         Token token;
         token.lineNum = lineNum;
         token.charNum = charNum;
-        token.value = tokenStr;
         token.type = ResolveTokenType(tokenStr);
+        token.value = tokenStr;
         tokens.push_back(token);
     }
 
@@ -284,32 +284,8 @@ std::vector<Token> Lexer::UnitTest_CodeToTokens(const std::string input)
         Token token;
         token.lineNum = 0;
         token.charNum = 0;
+        token.type = Token::StringToType(type);
         token.value = ss.str();
-
-        if (type == "identifier")
-        {
-            token.type = Token_Type::TOKEN_TYPE_IDENTIFIER;
-        }
-        else if (type == "string")
-        {
-            token.type = Token_Type::TOKEN_TYPE_STRING;
-        }
-        else if (type == "numeric")
-        {
-            token.type = Token_Type::TOKEN_TYPE_NUMERIC;
-        }
-        else if (type == "operator")
-        {
-            token.type = Token_Type::TOKEN_TYPE_OPERATOR;
-        }
-        else if (type == "seperator")
-        {
-            token.type = Token_Type::TOKEN_TYPE_SEPERATOR;
-        }
-        else
-        {
-            token.type = Token_Type::TOKEN_TYPE_INVALID;
-        }
 
         tokens.push_back(token);
     }
@@ -324,20 +300,7 @@ std::string Lexer::UnitTest_TokensToCode(const std::vector<Token> tokens)
     for (size_t i = 0; i < tokens.size(); i++)
     {
         Token token = tokens[i];
-
-        std::string type = "invalid";
-        if (token.type == Token_Type::TOKEN_TYPE_IDENTIFIER)
-            type = "identifier";
-        else if (token.type == Token_Type::TOKEN_TYPE_STRING)
-            type = "string";
-        else if (token.type == Token_Type::TOKEN_TYPE_NUMERIC)
-            type = "numeric";
-        else if (token.type == Token_Type::TOKEN_TYPE_OPERATOR)
-            type = "operator";
-        else if (token.type == Token_Type::TOKEN_TYPE_SEPERATOR)
-            type = "seperator";
-
-        ss << "[" << type << " (" << token.value << ")] ";
+        ss << "[" << Token::TypeToString(token.type) << " (" << token.value << ")] ";
     }
 
     return ss.str();
