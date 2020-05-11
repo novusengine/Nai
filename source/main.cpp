@@ -20,7 +20,7 @@ int main()
             if (result)
             {
                 Lexer lexer;
-                lexer.Init(buffer, result);
+                lexer.Init(buffer, static_cast<long>(result));
                 lexer.Process();
             }
         }
