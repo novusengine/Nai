@@ -1,7 +1,7 @@
 #include <pch/Build.h>
 #include <iostream>
 
-//#include "Lexer/Lexer.h"
+#include "Lexer/Lexer.h"
 
 int main()
 {
@@ -19,9 +19,9 @@ int main()
             size_t result = fread(buffer, 1, size, file);
             if (result)
             {
-               /* Lexer lexer;
+                Lexer lexer;
                 lexer.Init(buffer, result);
-                lexer.Process();*/
+                lexer.Process();
             }
         }
 
