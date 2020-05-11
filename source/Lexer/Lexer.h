@@ -12,6 +12,7 @@ public:
     void Init(char* inBuffer, long size);
     void Process();
 
+    const std::vector<Token> GetTokens() { return tokens; }
     Token_Type ResolveTokenType(std::string& input);
 
     // This function expects to start at a minimum of 1 position after the first "/"
@@ -24,8 +25,9 @@ public:
     void ExtractTokens(long bufferPos = defaultBufferPosition);
     void ProcessTokens();
 
-    // Unit Test
-    static std::vector<Token> UnitTest(std::string input);
+    // Unit Tests
+    static std::vector<Token> UnitTest_CodeToTokens(const std::string input);
+    static std::string UnitTest_TokensToCode(const std::vector<Token> tokens);
 private:
     const static int defaultBufferPosition = -1;
     char* buffer;

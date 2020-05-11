@@ -229,7 +229,7 @@ void Lexer::ProcessTokens()
     }
 }
 
-std::vector<Token> Lexer::UnitTest(std::string input)
+std::vector<Token> Lexer::UnitTest_CodeToTokens(const std::string input)
 {
     std::vector<Token> tokens;
 
@@ -315,4 +315,33 @@ std::vector<Token> Lexer::UnitTest(std::string input)
     }
 
     return tokens;
+}
+
+std::string Lexer::UnitTest_TokensToCode(const std::vector<Token> tokens)
+{
+    std::stringstream ss;
+
+    for (size_t i = 0; i < tokens.size(); i++)
+    {
+        Token token = tokens[i];
+        ss << token.value;
+
+        if (token.value == ";")
+            ss << std::endl;
+        else if (token.value == ",")
+        {
+            ss << " ";
+        }
+        else if (token.type != Token_Type::TOKEN_TYPE_SEPERATOR)
+        {
+            Token nextToken = tokens[i + 1];
+
+            if (nextToken.type == Token_Type::TOKEN_TYPE_SEPERATOR)
+                continue;
+
+            ss << " ";
+        }
+    }
+
+    return ss.str();
 }

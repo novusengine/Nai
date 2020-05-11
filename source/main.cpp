@@ -22,13 +22,14 @@ int main()
                 Lexer lexer;
                 lexer.Init(buffer, static_cast<long>(result));
                 lexer.Process();
+
+                std::string code = Lexer::UnitTest_TokensToCode(lexer.GetTokens());
             }
         }
 
         fclose(file);
     }
 
-    //auto tokens = Lexer::UnitTest("[identifier (int)] [identifier (myInt)][operator (=)] [literal (5)] [seperator(;)]");
-
+    //auto tokens = Lexer::UnitTest_CodeToTokens("[identifier (int)] [identifier (myInt)][operator (=)] [literal (5)] [seperator(;)]");
     return 0;
 }
