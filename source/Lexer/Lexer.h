@@ -12,6 +12,9 @@ public:
     void Init(char* inBuffer, long size);
     void Process();
 
+    bool IsDigit(char c);
+    bool IsNumeric(std::string& str);
+
     const std::vector<Token> GetTokens() { return tokens; }
     Token_Type ResolveTokenType(std::string& input);
 

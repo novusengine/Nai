@@ -38,6 +38,62 @@ void Lexer::Process()
     ProcessTokens();
 }
 
+bool Lexer::IsDigit(char c)
+{
+    return c >= '0' && c <= '9';
+}
+
+bool Lexer::IsNumeric(std::string& str)
+{
+    size_t strSize = str.size();
+    if (strSize == 0)
+        return false;
+
+    int dotCount = 0;
+    int minusCount = 0;
+    int fCount = 0;
+    int xCount = 0;
+    bool hexPresent = false;
+
+    for (size_t i = 0; i < strSize; i++)
+    {
+        char tmp = str[i];
+        switch (tmp)
+        {
+        case '.':
+            if (++dotCount != 1)
+                return false;
+            break;
+        case '-':
+            if (++minusCount != 1)
+                return false;
+            break;
+        case 'f':
+            if ((++fCount != 1 && xCount == 0) && i == strSize - 1)
+                return false;
+            break;
+        case 'x':
+        case 'X':
+            // Hex 
+            if (++xCount != 1 && i != 1)
+                return false;
+            break;
+        default:
+            if ((tmp >= 'a' && tmp <= 'f') || (tmp >= 'A' && tmp <= 'F'))
+                hexPresent = true;
+            else if (tmp < '0' || tmp > '9')
+                return false;
+            break;
+        }
+    }
+
+    // If we detect hexidecimal characters check if hex format has been detected
+    if (hexPresent && xCount == 0)
+        return false;
+
+    return true;
+}
+
 Token_Type Lexer::ResolveTokenType(std::string& input)
 {
     Token_Type type = Token_Type::TOKEN_TYPE_IDENTIFIER;
@@ -47,25 +103,9 @@ Token_Type Lexer::ResolveTokenType(std::string& input)
         input.erase(std::remove(input.begin(), input.end(), '"'), input.end());
         type = Token_Type::TOKEN_TYPE_STRING;
     }
-    else
+    else if (IsNumeric(input))
     {
-        // Check if value is numeric
-        try
-        {
-            std::stoll(input);
-            type = Token_Type::TOKEN_TYPE_NUMERIC;
-        }
-        catch (std::exception) {}
-
-        if (type != Token_Type::TOKEN_TYPE_NUMERIC)
-        {
-            try
-            {
-                std::stod(input);
-                type = Token_Type::TOKEN_TYPE_NUMERIC;
-            }
-            catch (std::exception) {}
-        }
+        type = Token_Type::TOKEN_TYPE_NUMERIC;
     }
     return type;
 }
@@ -165,11 +205,21 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
     long endPos = FindNextWhitespaceOrNewline(bufferPos);
     long lastOperatorIndex = bufferPos;
 
+
     for (; bufferPos < endPos; bufferPos++)
     {
-        auto itr = charToTypeMap.find(buffer[bufferPos]);
+        char tmp = buffer[bufferPos];
+
+        auto itr = charToTypeMap.find(tmp);
         if (itr != charToTypeMap.end())
         {
+            if (tmp == '.')
+            {
+                char lastChar = buffer[bufferPos - 1];
+                if (IsDigit(lastChar))
+                    continue;
+            }
+
             // Handle Previous Token
             if (lastOperatorIndex != bufferPos)
             {
