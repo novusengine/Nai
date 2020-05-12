@@ -61,11 +61,11 @@ bool Lexer::IsNumeric(std::string& str)
         switch (tmp)
         {
         case '.':
-            if (++dotCount != 1)
+            if (++dotCount != 1 && i != 0 && i != strSize - 1)
                 return false;
             break;
         case '-':
-            if (++minusCount != 1)
+            if (++minusCount != 1 && i == 0)
                 return false;
             break;
         case 'f':
