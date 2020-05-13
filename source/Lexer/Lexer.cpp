@@ -96,7 +96,7 @@ bool Lexer::IsNumeric(std::string_view& str)
 
 bool Lexer::IsKeyword(std::string_view& str)
 {
-    return str == "fn" || str == "while" || str == "if" || str == "for";
+    return str == "fn" || str == "struct" ||str == "enum" || str == "while" || str == "if" || str == "for";
 }
 
 TokenType Lexer::ResolveTokenType(std::string_view& input)
