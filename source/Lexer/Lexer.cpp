@@ -16,20 +16,20 @@ void Lexer::Init(char* inBuffer, long size)
     tokens.reserve(1024);
     charToTypeMap =
     {
-        { ':', Token_Type::TOKEN_TYPE_OPERATOR }, // Declaration
-        { '=', Token_Type::TOKEN_TYPE_OPERATOR }, // Assignment
-        { '*', Token_Type::TOKEN_TYPE_OPERATOR }, // Pointer/Dereference/Multiplicative
-        { '&', Token_Type::TOKEN_TYPE_OPERATOR }, // Get Memory Address
-        { '.', Token_Type::TOKEN_TYPE_OPERATOR }, // Access
-        { ',', Token_Type::TOKEN_TYPE_SEPERATOR }, // Parameter Seperator
+        { ':', TokenType::TOKENTYPE_DECLARATION }, // Declaration
+        { '=', TokenType::TOKENTYPE_OP_ASSIGN }, // Assignment
+        { '*', TokenType::TOKENTYPE_OP_MULTIPLY }, // Pointer/Dereference/Multiplicative
+        { '&', TokenType::TOKENTYPE_BITWISE_AND }, // Bitwise And / Get Address
+        { '|', TokenType::TOKENTYPE_BITWISE_OR }, // Bitwise Or
+        { '.', TokenType::TOKENTYPE_OP_ACCESS }, // Access
+        { ',', TokenType::TOKENTYPE_COMMA }, // Parameter Seperator
         //{ "::", Token_Type::TOKEN_TYPE_OPERATOR }, // Const Declaration
         //{ ":=", Token_Type::TOKEN_TYPE_OPERATOR }, // Declaration Assignment
-        //{ "fn", Token_Type::TOKEN_TYPE_IDENTIFIER }, // Signals start of function
-        { '(', Token_Type::TOKEN_TYPE_SEPERATOR }, // Start Paramlist / Casting / Math
-        { ')', Token_Type::TOKEN_TYPE_SEPERATOR }, // End Paramlist / Casting / Math
-        { '{', Token_Type::TOKEN_TYPE_SEPERATOR }, // Start Scope
-        { '}', Token_Type::TOKEN_TYPE_SEPERATOR }, // End Scope
-        { ';', Token_Type::TOKEN_TYPE_SEPERATOR } // End of statement
+        { '(', TokenType::TOKENTYPE_LPAREN }, // Start Paramlist / Casting / Math
+        { ')', TokenType::TOKENTYPE_RPAREN }, // End Paramlist / Casting / Math
+        { '{', TokenType::TOKENTYPE_LBRACE }, // Start Scope
+        { '}', TokenType::TOKENTYPE_RBRACE }, // End Scope
+        { ';', TokenType::TOKENTYPE_SEMICOLON } // End of statement
     };
 }
 
@@ -43,7 +43,7 @@ bool Lexer::IsDigit(char c)
     return c >= '0' && c <= '9';
 }
 
-bool Lexer::IsNumeric(std::string& str)
+bool Lexer::IsNumeric(std::string_view& str)
 {
     size_t strSize = str.size();
     if (strSize == 0)
@@ -94,20 +94,145 @@ bool Lexer::IsNumeric(std::string& str)
     return true;
 }
 
-Token_Type Lexer::ResolveTokenType(std::string& input)
+bool Lexer::IsKeyword(std::string_view& str)
 {
-    Token_Type type = Token_Type::TOKEN_TYPE_IDENTIFIER;
+    return str == "fn" || str == "while" || str == "if" || str == "for";
+}
+
+TokenType Lexer::ResolveTokenType(std::string_view& input)
+{
+    TokenType type = TokenType::TOKENTYPE_IDENTIFIER;
 
     if (input[0] == '"')
     {
-        input.erase(std::remove(input.begin(), input.end(), '"'), input.end());
-        type = Token_Type::TOKEN_TYPE_STRING;
+        input.remove_prefix(1);
+        input.remove_suffix(1);
+        type = TokenType::TOKENTYPE_STRING;
+    }
+    else if (IsKeyword(input))
+    {
+        type = TokenType::TOKENTYPE_KEYWORD;
     }
     else if (IsNumeric(input))
     {
-        type = Token_Type::TOKEN_TYPE_NUMERIC;
+        type = TokenType::TOKENTYPE_NUMERIC;
+    }
+    else if (input.size() == 1)
+    {
+        char x = input[0];
+        if ((x > 36 && x < 39) || (x > 39 && x < 48) || 
+            (x > 57 && x < 64) || (x == 123 || x == 125))
+        {
+            type = static_cast<TokenType>(input[0]);
+        }
     }
     return type;
+}
+
+void Lexer::ResolveOperator(long& bufferPos, Token& token)
+{
+    if (token.type == TokenType::TOKENTYPE_DECLARATION)
+    {
+        if (buffer[bufferPos + 1] == ':')
+        {
+            token.value += ':';
+            token.type = TokenType::TOKENTYPE_CONST_DECLARATION;
+            bufferPos += 1;
+        }
+
+        if (buffer[bufferPos + 1] == '=')
+        {
+            token.value += '=';
+
+            if (token.type == TokenType::TOKENTYPE_DECLARATION)
+                token.type = TokenType::TOKENTYPE_DECLARATION_ASSIGN;
+            else
+                token.type = TokenType::TOKENTYPE_CONST_DECLARATION_ASSIGN;
+
+            bufferPos += 1;
+        }
+    }
+    else if (token.type == TokenType::TOKENTYPE_OP_ASSIGN)
+    {
+        if (buffer[bufferPos + 1] == '=')
+        {
+            token.value += '=';
+            token.type = TokenType::TOKENTYPE_OP_EQUALS;
+            bufferPos += 1;
+        }
+    }
+    else if (token.type == TokenType::TOKENTYPE_OP_ADD)
+    {
+        if (buffer[bufferPos + 1] == '=')
+        {
+            token.value += '=';
+            token.type = TokenType::TOKENTYPE_OP_ADD_ASSIGN;
+            bufferPos += 1;
+        }
+    }
+    else if (token.type == TokenType::TOKENTYPE_OP_SUBTRACT)
+    {
+        if (buffer[bufferPos + 1] == '=')
+        {
+            token.value += '=';
+            token.type = TokenType::TOKENTYPE_OP_SUBTRACT_ASSIGN;
+            bufferPos += 1;
+        }
+    }
+    else if (token.type == TokenType::TOKENTYPE_OP_MULTIPLY)
+    {
+        if (buffer[bufferPos + 1] == '=')
+        {
+            token.value += '=';
+            token.type = TokenType::TOKENTYPE_OP_MULTIPLY_ASSIGN;
+            bufferPos += 1;
+        }
+    }
+    else if (token.type == TokenType::TOKENTYPE_OP_DIVIDE)
+    {
+        if (buffer[bufferPos + 1] == '=')
+        {
+            token.value += '=';
+            token.type = TokenType::TOKENTYPE_OP_DIVIDE_ASSIGN;
+            bufferPos += 1;
+        }
+    }
+    else if (token.type == TokenType::TOKENTYPE_OP_GREATER)
+    {
+        if (buffer[bufferPos + 1] == '=')
+        {
+            token.value += '=';
+            token.type = TokenType::TOKENTYPE_OP_GREATER_EQUALS;
+            bufferPos += 1;
+        }
+    }
+    else if (token.type == TokenType::TOKENTYPE_OP_LESS)
+    {
+        if (buffer[bufferPos + 1] == '=')
+        {
+            token.value += '=';
+            token.type = TokenType::TOKENTYPE_OP_LESS_EQUALS;
+            bufferPos += 1;
+        }
+    }
+    else if (token.type == TokenType::TOKENTYPE_BITWISE_AND)
+    {
+        if (buffer[bufferPos + 1] == '&')
+        {
+            token.value += '&';
+            token.type = TokenType::TOKENTYPE_OP_AND;
+            bufferPos += 1;
+        }
+    }
+    else if (token.type == TokenType::TOKENTYPE_BITWISE_OR)
+    {
+        if (buffer[bufferPos + 1] == '|')
+        {
+            token.value += '|';
+            token.type = TokenType::TOKENTYPE_OP_OR;
+            bufferPos += 1;
+        }
+    }
 }
 
 void Lexer::ResolveMultilineComment(long& bufferPos)
@@ -131,7 +256,6 @@ void Lexer::ResolveMultilineComment(long& bufferPos)
 
     bufferPos += 2;
 }
-
 long Lexer::SkipWhitespaceOrNewline(long bufferPos /* = defaultBufferPosition */)
 {
     if (bufferPos == -1)
@@ -148,7 +272,6 @@ long Lexer::SkipWhitespaceOrNewline(long bufferPos /* = defaultBufferPosition */
 
     return bufferPos;
 }
-
 void Lexer::SkipComment(long& bufferPos)
 {
     if (bufferPos == -1)
@@ -179,7 +302,6 @@ void Lexer::SkipComment(long& bufferPos)
         }
     }
 }
-
 long Lexer::FindNextWhitespaceOrNewline(long bufferPos /* = defaultBufferPosition */)
 {
     if (bufferPos == -1)
@@ -205,7 +327,6 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
     long endPos = FindNextWhitespaceOrNewline(bufferPos);
     long lastOperatorIndex = bufferPos;
 
-
     for (; bufferPos < endPos; bufferPos++)
     {
         char tmp = buffer[bufferPos];
@@ -224,7 +345,7 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
             if (lastOperatorIndex != bufferPos)
             {
                 long tmpSize = bufferPos - lastOperatorIndex;
-                std::string tokenStr(&buffer[lastOperatorIndex], tmpSize);
+                std::string_view tokenStr(&buffer[lastOperatorIndex], tmpSize);
 
                 Token token;
                 token.lineNum = lineNum;
@@ -239,7 +360,13 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
             token.charNum = charNum;
             token.value = itr->first;
             token.type = itr->second;
+
+            // ResolveOperator will correct the "Type" of the Token if needed
+            ResolveOperator(bufferPos, token);
             tokens.push_back(token);
+
+            if (token.type == TokenType::TOKENTYPE_LPAREN)
+                tokens[tokens.size() - 2].type = TokenType::TOKENTYPE_KEYWORD;
 
             lastOperatorIndex = bufferPos + 1;
         }
@@ -248,7 +375,7 @@ void Lexer::ExtractTokens(long bufferPos /* = defaultBufferPosition */)
     if (bufferPos != lastOperatorIndex)
     {
         long tmpSize = bufferPos - lastOperatorIndex;
-        std::string tokenStr(&buffer[lastOperatorIndex], tmpSize);
+        std::string_view tokenStr(&buffer[lastOperatorIndex], tmpSize);
 
         Token token;
         token.lineNum = lineNum;

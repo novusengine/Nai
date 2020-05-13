@@ -13,10 +13,13 @@ public:
     void Process();
 
     bool IsDigit(char c);
-    bool IsNumeric(std::string& str);
+    bool IsNumeric(std::string_view& str);
+    bool IsKeyword(std::string_view& str);
 
     const std::vector<Token> GetTokens() { return tokens; }
-    Token_Type ResolveTokenType(std::string& input);
+    TokenType ResolveTokenType(std::string_view& input);
+
+    void ResolveOperator(long& bufferPos, Token& token);
 
     // This function expects to start at a minimum of 1 position after the first "/"
     void ResolveMultilineComment(long& bufferPos);
@@ -41,5 +44,5 @@ private:
     int charNum;
 
     std::vector<Token> tokens;
-    std::unordered_map<char, Token_Type> charToTypeMap; // TODO: Move this to something faster (Char -> Token_Type)
+    std::unordered_map<char, TokenType> charToTypeMap; // TODO: Move this to something faster (Char -> Token_Type)
 };
