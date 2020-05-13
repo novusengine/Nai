@@ -4,41 +4,41 @@
 
 enum class TokenType
 {
-    TOKENTYPE_OP_MODULUS = 37,
-    TOKENTYPE_BITWISE_AND = 38,
-    TOKENTYPE_LPAREN = 40,
-    TOKENTYPE_RPAREN = 41,
-    TOKENTYPE_OP_MULTIPLY = 42,
-    TOKENTYPE_OP_ADD = 43,
-    TOKENTYPE_COMMA = 44,
-    TOKENTYPE_OP_SUBTRACT = 45,
-    TOKENTYPE_OP_ACCESS = 46,
-    TOKENTYPE_OP_DIVIDE = 47,
-    TOKENTYPE_DECLARATION = 58,
-    TOKENTYPE_SEMICOLON = 59,
-    TOKENTYPE_OP_LESS = 60,
-    TOKENTYPE_OP_ASSIGN = 61,
-    TOKENTYPE_OP_GREATER = 62,
-    TOKENTYPE_LBRACE = 123,
-    TOKENTYPE_BITWISE_OR = 124,
-    TOKENTYPE_RBRACE = 125,
+    OP_MODULUS = 37,
+    BITWISE_AND = 38,
+    LPAREN = 40,
+    RPAREN = 41,
+    OP_MULTIPLY = 42,
+    OP_ADD = 43,
+    COMMA = 44,
+    OP_SUBTRACT = 45,
+    OP_ACCESS = 46,
+    OP_DIVIDE = 47,
+    DECLARATION = 58,
+    SEMICOLON = 59,
+    OP_LESS = 60,
+    OP_ASSIGN = 61,
+    OP_GREATER = 62,
+    LBRACE = 123,
+    BITWISE_OR = 124,
+    RBRACE = 125,
 
-    TOKENTYPE_IDENTIFIER = 256,
-    TOKENTYPE_NUMERIC,
-    TOKENTYPE_STRING,
-    TOKENTYPE_KEYWORD,
-    TOKENTYPE_DECLARATION_ASSIGN,
-    TOKENTYPE_CONST_DECLARATION,
-    TOKENTYPE_CONST_DECLARATION_ASSIGN,
-    TOKENTYPE_OP_EQUALS,
-    TOKENTYPE_OP_ADD_ASSIGN,
-    TOKENTYPE_OP_SUBTRACT_ASSIGN,
-    TOKENTYPE_OP_MULTIPLY_ASSIGN,
-    TOKENTYPE_OP_DIVIDE_ASSIGN,
-    TOKENTYPE_OP_GREATER_EQUALS,
-    TOKENTYPE_OP_LESS_EQUALS,
-    TOKENTYPE_OP_AND,
-    TOKENTYPE_OP_OR,
+    IDENTIFIER = 256,
+    NUMERIC,
+    STRING,
+    KEYWORD,
+    DECLARATION_ASSIGN,
+    CONST_DECLARATION,
+    CONST_DECLARATION_ASSIGN,
+    OP_EQUALS,
+    OP_ADD_ASSIGN,
+    OP_SUBTRACT_ASSIGN,
+    OP_MULTIPLY_ASSIGN,
+    OP_DIVIDE_ASSIGN,
+    OP_GREATER_EQUALS,
+    OP_LESS_EQUALS,
+    OP_AND,
+    OP_OR,
 
     TOKEN_TYPE_INVALID = 999
 };
@@ -53,15 +53,15 @@ public:
 
     static std::string TypeToString(TokenType type)
     {
-        if (type == TokenType::TOKENTYPE_IDENTIFIER)
+        if (type == TokenType::IDENTIFIER)
             return "identifier";
-        else if (type == TokenType::TOKENTYPE_STRING)
+        else if (type == TokenType::STRING)
             return "string";
-        else if (type == TokenType::TOKENTYPE_NUMERIC)
+        else if (type == TokenType::NUMERIC)
             return "numeric";
-        /*else if (type == TokenType::TOKENTYPE_OPERATOR)
+        /*else if (type == TokenType::OPERATOR)
             return "operator";
-        else if (type == TokenType::TOKENTYPE_SEPERATOR)
+        else if (type == TokenType::SEPERATOR)
             return "seperator";*/
 
         return "invalid";
@@ -69,15 +69,15 @@ public:
     static TokenType StringToType(std::string input)
     {
         if (input == "identifier")
-            return TokenType::TOKENTYPE_IDENTIFIER;
+            return TokenType::IDENTIFIER;
         else if (input == "string")
-            return TokenType::TOKENTYPE_STRING;
+            return TokenType::STRING;
         else if (input == "numeric")
-            return TokenType::TOKENTYPE_NUMERIC;
+            return TokenType::NUMERIC;
         /*else if (input == "operator")
-            return TokenType::TOKENTYPE_OPERATOR;
+            return TokenType::OPERATOR;
         else if (input == "seperator")
-            return TokenType::TOKENTYPE_SEPERATOR;*/
+            return TokenType::SEPERATOR;*/
 
         return TokenType::TOKEN_TYPE_INVALID;
     }
