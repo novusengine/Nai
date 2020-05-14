@@ -5,6 +5,9 @@
 
 int main()
 {
+    Lexer lexer;
+    lexer.Init();
+
     FILE* file = nullptr;
     fopen_s(&file, "text.nai", "r");
     if (file)
@@ -19,11 +22,10 @@ int main()
             size_t result = fread(buffer, 1, size, file);
             if (result)
             {
-                Lexer lexer;
-                lexer.Init(buffer, static_cast<long>(result));
-                lexer.Process();
+                LexerFile lexerFile(buffer, static_cast<long>(result));
+                lexer.Process(lexerFile);
 
-                std::string code = Lexer::UnitTest_TokensToCode(lexer.GetTokens());
+                std::string code = Lexer::UnitTest_TokensToCode(lexerFile.GetTokens());
             }
         }
 
