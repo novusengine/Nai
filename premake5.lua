@@ -33,6 +33,7 @@ project (PROJECT_NAME)
     postbuildcommands { "rmdir /Q /S %{OUTPUT_BASE_PATH}\\testresults" }
 
     files { "source/**.h", "source/**.hpp", "source/**.cpp" }
+    flags { "MultiProcessorCompile" }
     
     filter "configurations:Debug"
         defines { "NAI_DEBUG=1", "NAI_RELEASE=0", "NAI_CLANG=0" }
