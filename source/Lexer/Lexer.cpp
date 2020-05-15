@@ -38,6 +38,10 @@ void Lexer::Process(LexerFile& file)
     totalLineNum += file.lineNum;
 }
 
+bool Lexer::IsAlpha(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
 bool Lexer::IsDigit(char c)
 {
     return c >= '0' && c <= '9';
@@ -46,38 +50,49 @@ bool Lexer::IsNumeric(std::string_view& str)
 {
     size_t strSize = str.size();
 
-    bool result = false;
-    bool dotFound = false;
+    int dotCount = 0;
+    int minusCount = 0;
+    int fCount = 0;
+    int xCount = 0;
+    bool hexPresent = false;
+
     for (size_t i = 0; i < strSize; i++)
     {
         char tmp = str[i];
-        if (tmp == OP_ACCESS)
+        switch (tmp)
         {
-            dotFound = true;
+        case '.':
+            if (++dotCount != 1 && i != 0 && i != strSize - 1)
+                return false;
+            break;
+        case '-':
+            if (++minusCount != 1 && i == 0)
+                return false;
+            break;
+        case 'f':
+            if ((++fCount != 1 && xCount == 0) && i == strSize - 1)
+                return false;
+            break;
+        case 'x':
+        case 'X':
+            // Hex 
+            if (++xCount != 1 && i != 1)
+                return false;
+            break;
+        default:
+            if ((tmp >= 'a' && tmp <= 'f') || (tmp >= 'A' && tmp <= 'F'))
+                hexPresent = true;
+            else if (tmp < '0' || tmp > '9')
+                return false;
             break;
         }
     }
 
-    if (!dotFound)
-    {
-        long literal = 0;
-        auto filt = std::from_chars(str.data(), str.data() + str.size(), literal);
-        if (filt.ec == std::errc())
-        {
-            result = true;
-        }
-    }
-    else
-    {
-        double literal = 0;
-        auto filt = std::from_chars(str.data(), str.data() + str.size(), literal);
-        if (filt.ec == std::errc())
-        {
-            result = true;
-        }
-    }
+    // If we detect hexidecimal characters check if hex format has been detected
+    if (hexPresent && xCount == 0)
+        return false;
 
-    return result;
+    return true;
 }
 bool Lexer::IsKeyword(std::string_view& str)
 {
@@ -106,6 +121,14 @@ TokenType Lexer::ResolveTokenType(LexerFile& file, std::string_view& input)
     }
     else
     {
+        // Report Error, an identifier cannot start with a value thats not an alpha or underscore
+        char tmp = input[0];
+        if (!IsAlpha(tmp) && tmp != '_')
+        {
+            ReportError(3, "Found identifier with invalid starting character. The following characters are valid: a->z, A->Z and _ (Line: %d, Col: %d)\n", static_cast<int>(file.lineNum), static_cast<int>(file.colNum));
+            assert(false);
+        }
+
         if (file.tokens.size() != 0)
         {
             Token& prevToken = file.GetToken(file.tokens.size() - 1);
@@ -421,7 +444,6 @@ void Lexer::ResolveMultilineComment(LexerFile& file)
     // We failed to find the end of the multi line comment
     if (file.size == file.bufferPosition + 1)
     {
-        // @TODO: Report Error
         ReportError(2, "Found Multi line comment without closing symbol (Line: %d, Col: %d)\n", static_cast<int>(lineNum), static_cast<int>(colNum));
         assert(false);
     }

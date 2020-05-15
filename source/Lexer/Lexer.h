@@ -31,6 +31,7 @@ public:
     void Init();
     void Process(LexerFile& file);
 
+    bool IsAlpha(char c);
     bool IsDigit(char c);
     bool IsNumeric(std::string_view& str);
     bool IsKeyword(std::string_view& str);
@@ -51,7 +52,7 @@ public:
     void ReportError(int errorCode, std::string str, Args... args)
     {
         std::stringstream ss;
-        ss << "Error 1" << errorCode << ": " << str;
+        ss << "Lexer Error 1" << errorCode << ": " << str;
 
         printf_s(ss.str().c_str(), args...);
     }
@@ -85,7 +86,7 @@ private:
     const char SPACE = ' ';
 
     const char OP_ASSIGN = '=';
-    const char OP_NOT = '-';
+    const char OP_NOT = '!';
     const char OP_ADD = '+';
     const char OP_SUBTRACT = '-';
     const char OP_MULTIPLY = '*';
