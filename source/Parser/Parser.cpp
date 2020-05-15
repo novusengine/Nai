@@ -1,5 +1,5 @@
 #include <pch/Build.h>
-#include "SyntaxAnalyser.h"
+#include "Parser.h"
 
 void SyntaxAnalyser::Init(std::vector<Token> tokens)
 {

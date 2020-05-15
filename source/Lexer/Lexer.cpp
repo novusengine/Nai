@@ -45,8 +45,6 @@ bool Lexer::IsDigit(char c)
 bool Lexer::IsNumeric(std::string_view& str)
 {
     size_t strSize = str.size();
-    if (strSize == 0)
-        return false;
 
     bool result = false;
     bool dotFound = false;
@@ -83,22 +81,18 @@ bool Lexer::IsNumeric(std::string_view& str)
 }
 bool Lexer::IsKeyword(std::string_view& str)
 {
+    // @TODO: Turn into hash table
     return str == KEYWORD_FUNCTION || str == KEYWORD_STRUCT ||str == KEYWORD_ENUM || str == KEYWORD_WHILE || str == KEYWORD_IF || str == KEYWORD_FOR || str == KEYWORD_TRUE || str == KEYWORD_FALSE || str == KEYWORD_BREAK || str == KEYWORD_CONTINUE || str == KEYWORD_RETURN;
 }
 
 TokenType Lexer::ResolveTokenType(LexerFile& file, std::string_view& input)
 {
     TokenType type = TokenType::IDENTIFIER;
-    size_t inputSize = input.size();
 
-    if (inputSize >= 2 && input[0] == STRING_SYMBOL && input[inputSize - 1] == STRING_SYMBOL)
+    if (input[0] == STRING_SYMBOL)
     {
-        if (inputSize > 2)
-        {
-            input.remove_prefix(1);
-            input.remove_suffix(1);
-        }
-        else input.remove_prefix(2);
+        input.remove_suffix(1);
+        input.remove_prefix(1);
 
         type = TokenType::STRING;
     }
@@ -483,7 +477,6 @@ long Lexer::FindNextWhitespaceOrNewline(LexerFile& file, long bufferPos /* = def
     // We found a string symbol at some point, but we did not find the closing symbol
     if (stringError || (stringFound && bufferPos == file.size))
     {
-        // @TODO: Provide Error here
         ReportError(1, "Found string without closing symbol (Line: %d , Col: %d)\n", static_cast<int>(file.lineNum), static_cast<int>(stringColPosition));
         assert(false);
     }
