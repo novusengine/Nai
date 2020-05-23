@@ -1,5 +1,7 @@
 PROJECT_NAME = "Nai"
 
+OUTPUT_BASE_PATH = '%{cfg.buildtarget.directory}'
+
 -- Workspace (Solution)
 workspace (PROJECT_NAME)
     configurations { "Debug", "Release", "DebugClang", "ReleaseClang" }
@@ -27,7 +29,11 @@ project (PROJECT_NAME)
     pchheader "pch/Build.h"
     pchsource "source/pch/Build.cpp"
 
+    postbuildmessage "Removing '%{OUTPUT_BASE_PATH}\\testresults' to fix unittests"
+    postbuildcommands { "rmdir /Q /S %{OUTPUT_BASE_PATH}\\testresults" }
+
     files { "source/**.h", "source/**.hpp", "source/**.cpp" }
+    flags { "MultiProcessorCompile" }
     
     filter "configurations:Debug"
         defines { "NAI_DEBUG=1", "NAI_RELEASE=0", "NAI_CLANG=0" }
@@ -60,3 +66,5 @@ project (PROJECT_NAME)
         optimize "On"
         toolset "msc-ClangCL"
         targetdir "bin/ReleaseClang"
+
+dofile("samples/unittests/premake5.lua")
