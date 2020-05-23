@@ -5,15 +5,16 @@
 const char* OP_NOT = "OP_NOT";
 const char* OP_MODULUS = "OP_MODULUS";
 const char* OP_BITWISE_AND = "OP_BITWISE_AND";
+const char* OPERATOR = "OPERATOR";
 const char* LPAREN = "LPAREN";
 const char* RPAREN = "RPAREN";
 const char* OP_MULTIPLY = "OP_MULTIPLY";
 const char* OP_ADD = "OP_ADD";
 const char* PARAM_SEPERATOR = "PARAM_SEPERATOR";
 const char* OP_SUBTRACT = "OP_SUBTRACT";
-const char* OP_ACCESS = "OP_ACCESS";
+const char* ACCESS = "OP_ACCESS";
 const char* OP_DIVIDE = "OP_DIVIDE";
-const char* OP_DECLARATION = "OP_DECLARATION";
+const char* DECLARATION = "OP_DECLARATION";
 const char* END_OF_LINE = "END_OF_LINE";
 const char* OP_LESS = "OP_LESS";
 const char* OP_ASSIGN = "OP_ASSIGN";
@@ -26,9 +27,11 @@ const char* NUMERIC = "NUMERIC";
 const char* STRING = "STRING";
 const char* FUNCTION_DECLARATION = "FUNCTION_DECLARATION";
 const char* FUNCTION_CALL = "FUNCTION_CALL";
+const char* LITERAL = "LITERAL";
 const char* ENUM = "ENUM";
 const char* STRUCT = "STRUCT";
 const char* DATATYPE = "DATATYPE";
+const char* KEYWORD = "KEYWORD";
 const char* KEYWORD_FUNCTION = "KEYWORD_FUNCTION";
 const char* KEYWORD_STRUCT = "KEYWORD_STRUCT";
 const char* KEYWORD_ENUM = "KEYWORD_ENUM";
@@ -40,9 +43,9 @@ const char* KEYWORD_FALSE = "KEYWORD_FALSE";
 const char* KEYWORD_BREAK = "KEYWORD_BREAK";
 const char* KEYWORD_CONTINUE = "KEYWORD_CONTINUE";
 const char* KEYWORD_RETURN = "KEYWORD_RETURN";
-const char* OP_DECLARATION_ASSIGN = "OP_DECLARATION_ASSIGN";
-const char* OP_CONST_DECLARATION = "OP_CONST_DECLARATION";
-const char* OP_CONST_DECLARATION_ASSIGN = "OP_CONST_DECLARATION_ASSIGN";
+const char* DECLARATION_ASSIGN = "OP_DECLARATION_ASSIGN";
+const char* CONST_DECLARATION = "OP_CONST_DECLARATION";
+const char* CONST_DECLARATION_ASSIGN = "OP_CONST_DECLARATION_ASSIGN";
 const char* OP_EQUALS = "OP_EQUALS";
 const char* OP_NOT_EQUALS = "OP_NOT_EQUALS";
 const char* OP_ADD_ASSIGN = "OP_ADD_ASSIGN";
@@ -65,7 +68,7 @@ std::string Token::TypeToString(TokenType type)
 {
     switch (type)
     {
-    case TokenType::OP_NOT:
+    /*case TokenType::OP_NOT:
         return OP_NOT;
     case TokenType::OP_MODULUS:
         return OP_MODULUS;
@@ -130,8 +133,10 @@ std::string Token::TypeToString(TokenType type)
     case TokenType::OP_BITWISE_SHIFT_LEFT:
         return OP_BITWISE_SHIFT_LEFT;
     case TokenType::OP_RETURN_TYPE:
-        return OP_RETURN_TYPE;
+        return OP_RETURN_TYPE;*/
 
+    case TokenType::OPERATOR:
+        return OPERATOR;
     case TokenType::LPAREN:
         return LPAREN;
     case TokenType::RPAREN:
@@ -147,21 +152,25 @@ std::string Token::TypeToString(TokenType type)
 
     case TokenType::IDENTIFIER:
         return IDENTIFIER;
-    case TokenType::NUMERIC:
+    /*case TokenType::NUMERIC:
         return NUMERIC;
     case TokenType::STRING:
         return STRING;
     case TokenType::FUNCTION_DECLARATION:
         return FUNCTION_DECLARATION;
     case TokenType::FUNCTION_CALL:
-        return FUNCTION_CALL;
+        return FUNCTION_CALL;*/
+    case TokenType::LITERAL:
+        return LITERAL;
     case TokenType::ENUM:
         return ENUM;
     case TokenType::STRUCT:
         return STRUCT;
     case TokenType::DATATYPE:
         return DATATYPE;
-    case TokenType::KEYWORD_FUNCTION:
+    case TokenType::KEYWORD:
+        return KEYWORD;
+    /*case TokenType::KEYWORD_FUNCTION:
         return KEYWORD_FUNCTION;
     case TokenType::KEYWORD_STRUCT:
         return KEYWORD_STRUCT;
@@ -182,7 +191,7 @@ std::string Token::TypeToString(TokenType type)
     case TokenType::KEYWORD_RETURN:
         return KEYWORD_RETURN;
     case TokenType::KEYWORD_BREAK:
-        return KEYWORD_BREAK;
+        return KEYWORD_BREAK*/
 
     default:
         break;
@@ -204,12 +213,12 @@ TokenType Token::StringToType(std::string input)
         return TokenType::OP_ADD;
     else if (input == OP_SUBTRACT)
         return TokenType::OP_SUBTRACT;
-    else if (input == OP_ACCESS)
-        return TokenType::OP_ACCESS;
+    else if (input == ACCESS)
+        return TokenType::ACCESS;
     else if (input == OP_DIVIDE)
         return TokenType::OP_DIVIDE;
-    else if (input == OP_DECLARATION)
-        return TokenType::OP_DECLARATION;
+    else if (input == DECLARATION)
+        return TokenType::DECLARATION;
     else if (input == OP_LESS)
         return TokenType::OP_LESS;
     else if (input == OP_ASSIGN)
@@ -218,7 +227,7 @@ TokenType Token::StringToType(std::string input)
         return TokenType::OP_GREATER;
     else if (input == OP_BITWISE_OR)
         return TokenType::OP_BITWISE_OR;
-    else if (input == OP_DECLARATION_ASSIGN)
+    /*else if (input == OP_DECLARATION_ASSIGN)
         return TokenType::OP_DECLARATION_ASSIGN;
     else if (input == OP_CONST_DECLARATION)
         return TokenType::OP_CONST_DECLARATION;
@@ -257,8 +266,10 @@ TokenType Token::StringToType(std::string input)
     else if (input == OP_BITWISE_SHIFT_LEFT)
         return TokenType::OP_BITWISE_SHIFT_LEFT;
     else if (input == OP_RETURN_TYPE)
-        return TokenType::OP_RETURN_TYPE;
+        return TokenType::OP_RETURN_TYPE;*/
 
+    if (input == OPERATOR)
+        return TokenType::OPERATOR;
     else if (input == LPAREN)
         return TokenType::LPAREN;
     else if (input == RPAREN)
@@ -274,17 +285,21 @@ TokenType Token::StringToType(std::string input)
 
     else if (input == IDENTIFIER)
         return TokenType::IDENTIFIER;
-    else if (input == NUMERIC)
-        return TokenType::NUMERIC;
-    else if (input == FUNCTION_DECLARATION)
-        return TokenType::FUNCTION_DECLARATION;
-    else if (input == FUNCTION_CALL)
-        return TokenType::FUNCTION_CALL;
+    /* else if (input == NUMERIC)
+         return TokenType::NUMERIC;
+     else if (input == FUNCTION_DECLARATION)
+         return TokenType::FUNCTION_DECLARATION;
+     else if (input == FUNCTION_CALL)
+         return TokenType::FUNCTION_CALL;*/
+    else if (input == LITERAL)
+        return TokenType::LITERAL;
     else if (input == ENUM)
         return TokenType::ENUM;
     else if (input == STRUCT)
         return TokenType::STRUCT;
-    else if (input == KEYWORD_FUNCTION)
+    else if (input == KEYWORD)
+        return TokenType::KEYWORD;
+    /*else if (input == KEYWORD_FUNCTION)
         return TokenType::KEYWORD_FUNCTION;
     else if (input == KEYWORD_STRUCT)
         return TokenType::KEYWORD_STRUCT;
@@ -305,7 +320,7 @@ TokenType Token::StringToType(std::string input)
     else if (input == KEYWORD_CONTINUE)
         return TokenType::KEYWORD_CONTINUE;
     else if (input == KEYWORD_RETURN)
-        return TokenType::KEYWORD_RETURN;
+        return TokenType::KEYWORD_RETURN;*/
 
-    return TokenType::TOKEN_TYPE_INVALID;
+    return TokenType::NONE;
 }

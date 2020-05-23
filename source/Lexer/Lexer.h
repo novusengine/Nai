@@ -36,9 +36,9 @@ public:
     bool IsNumeric(std::string_view& str);
     bool IsKeyword(std::string_view& str);
 
-    TokenType ResolveTokenType(LexerFile& file, std::string_view& input);
+    void ResolveTokenTypes(LexerFile& file, std::string_view& input, Token& token);
     void ResolveOperator(LexerFile& file, Token& token);
-    void ResolveKeyword(std::string_view& str, TokenType& type);
+    void ResolveKeyword(std::string_view& str, TokenSubType& type);
 
     void SkipComment(LexerFile& file);
     void ResolveMultilineComment(LexerFile& file);
@@ -95,8 +95,8 @@ private:
     const char OP_GREATER = '>';
     const char OP_BITWISE_AND = '&';
     const char OP_BITWISE_OR = '|';
-    const char OP_ACCESS = '.';
-    const char OP_DECLARATION = ':';
+    const char ACCESS = '.';
+    const char DECLARATION = ':';
 
     const char PARAM_SEPERATOR = ',';
     const char LPAREN = '(';

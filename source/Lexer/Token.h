@@ -4,34 +4,51 @@
 
 enum class TokenType
 {
-    OP_NOT = 33,
-    OP_MODULUS = 37,
-    OP_BITWISE_AND = 38,
-    LPAREN = 40,
-    RPAREN = 41,
-    OP_MULTIPLY = 42,
-    OP_ADD = 43,
-    PARAM_SEPERATOR = 44,
-    OP_SUBTRACT = 45,
-    OP_ACCESS = 46,
-    OP_DIVIDE = 47,
-    OP_DECLARATION = 58,
-    END_OF_LINE = 59,
-    OP_LESS = 60,
-    OP_ASSIGN = 61,
-    OP_GREATER = 62,
-    LBRACE = 123,
-    OP_BITWISE_OR = 124,
-    RBRACE = 125,
+    OP_NOT,
+    OP_MODULUS,
+    OP_BITWISE_AND,
+    OP_MULTIPLY,
+    OP_ADD,
+    OP_SUBTRACT,
+    OP_DIVIDE,
+    OP_LESS,
+    OP_ASSIGN,
+    OP_GREATER,
+    OP_BITWISE_OR,
+    ACCESS,
+    DECLARATION,
+    LPAREN,
+    RPAREN,
+    LBRACE,
+    RBRACE,
+    PARAM_SEPERATOR,
+    END_OF_LINE,
 
     IDENTIFIER = 256,
-    NUMERIC,
-    STRING,
-    FUNCTION_DECLARATION,
-    FUNCTION_CALL,
+    LITERAL,
     ENUM,
     STRUCT,
     DATATYPE,
+    KEYWORD,
+    OPERATOR,
+    NONE = 999,
+
+    // Non Terminal Symbols
+    NTS_START,
+    NTS_DECLARATION,
+    NTS_DECLARATION_TERMINATOR,
+    NTS_VALUE,
+    NTS_EXPRESSION,
+    NTS_EXPRESSION_SEQUENCE,
+    NTS_PARAMETER_LIST,
+    NTS_PARAMETER_TERMINATOR,
+    NTS_RETURN_TYPE
+};
+
+enum class TokenSubType
+{
+    NUMERIC = 256,
+    STRING,
     KEYWORD_FUNCTION,
     KEYWORD_STRUCT,
     KEYWORD_ENUM,
@@ -43,37 +60,53 @@ enum class TokenType
     KEYWORD_BREAK,
     KEYWORD_CONTINUE,
     KEYWORD_RETURN,
-    OP_DECLARATION_ASSIGN,
-    OP_CONST_DECLARATION,
-    OP_CONST_DECLARATION_ASSIGN,
+    DECLARATION_ASSIGN,
+    CONST_DECLARATION,
+    CONST_DECLARATION_ASSIGN,
     OP_EQUALS,
     OP_NOT_EQUALS,
-    OP_ADD_ASSIGN,
-    OP_SUBTRACT_ASSIGN,
-    OP_MULTIPLY_ASSIGN,
-    OP_DIVIDE_ASSIGN,
     OP_GREATER_EQUALS,
     OP_LESS_EQUALS,
     OP_INCREMENT,
     OP_DECREMENT,
     OP_AND,
     OP_OR,
-    OP_BITWISE_AND_ASSIGN,
-    OP_BITWISE_OR_ASSIGN,
     OP_BITWISE_SHIFT_RIGHT,
     OP_BITWISE_SHIFT_LEFT,
+    OP_ADD_ASSIGN,
+    OP_SUBTRACT_ASSIGN,
+    OP_MULTIPLY_ASSIGN,
+    OP_DIVIDE_ASSIGN,
+    OP_BITWISE_AND_ASSIGN,
+    OP_BITWISE_OR_ASSIGN,
     OP_RETURN_TYPE,
-
-    TOKEN_TYPE_INVALID = 999
+    FUNCTION_DECLARATION,
+    FUNCTION_CALL,
+    NONE = 999
 };
 
 class Token
 {
 public:
-    TokenType type = TokenType::TOKEN_TYPE_INVALID;
+    TokenType type = TokenType::NONE;
+    TokenSubType subType = TokenSubType::NONE;
     std::string value = "";
     int lineNum;
     int colNum;
+
+    bool IsExpressionOperator()
+    {
+        if (type == TokenType::OPERATOR &&
+            subType >= TokenSubType::OP_EQUALS &&
+            subType <= TokenSubType::OP_BITWISE_SHIFT_LEFT)
+            return true;
+
+        if (type >= TokenType::OP_NOT &&
+            type <= TokenType::OP_BITWISE_OR)
+            return true;
+
+        return false;
+    }
 
     static std::string TypeToString(TokenType type);
     static TokenType StringToType(std::string input);

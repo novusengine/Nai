@@ -11,7 +11,7 @@ void Lexer::Init()
 
     _operatorCharToTypeMap =
     {
-        { OP_DECLARATION, TokenType::OP_DECLARATION }, // Declaration
+        { DECLARATION, TokenType::DECLARATION }, // Declaration
         { OP_ASSIGN, TokenType::OP_ASSIGN }, // Assignment
         { OP_NOT, TokenType::OP_NOT }, // Checks if the expression is false or 0, if so the expression is true
         { OP_ADD, TokenType::OP_ADD }, // Addition
@@ -22,7 +22,7 @@ void Lexer::Init()
         { OP_BITWISE_OR, TokenType::OP_BITWISE_OR }, // Bitwise Or
         { OP_LESS, TokenType::OP_LESS }, // Less Than
         { OP_GREATER, TokenType::OP_GREATER }, // Greater Than
-        { OP_ACCESS, TokenType::OP_ACCESS }, // Access
+        { ACCESS, TokenType::ACCESS }, // Access
         { PARAM_SEPERATOR, TokenType::PARAM_SEPERATOR }, // Parameter Seperator
         { LPAREN, TokenType::LPAREN }, // Start Paramlist / Casting / Math
         { RPAREN, TokenType::RPAREN }, // End Paramlist / Casting / Math
@@ -100,27 +100,30 @@ bool Lexer::IsKeyword(std::string_view& str)
     return str == KEYWORD_FUNCTION || str == KEYWORD_STRUCT ||str == KEYWORD_ENUM || str == KEYWORD_WHILE || str == KEYWORD_IF || str == KEYWORD_FOR || str == KEYWORD_TRUE || str == KEYWORD_FALSE || str == KEYWORD_BREAK || str == KEYWORD_CONTINUE || str == KEYWORD_RETURN;
 }
 
-TokenType Lexer::ResolveTokenType(LexerFile& file, std::string_view& input)
+void Lexer::ResolveTokenTypes(LexerFile& file, std::string_view& input, Token& token)
 {
-    TokenType type = TokenType::IDENTIFIER;
-
     if (input[0] == STRING_SYMBOL)
     {
         input.remove_suffix(1);
         input.remove_prefix(1);
 
-        type = TokenType::STRING;
+        token.type = TokenType::LITERAL;
+        token.subType = TokenSubType::STRING;
     }
     else if (IsKeyword(input))
     {
-        ResolveKeyword(input, type);
+        token.type = TokenType::KEYWORD;
+        ResolveKeyword(input, token.subType);
     }
     else if (IsNumeric(input))
     {
-        type = TokenType::NUMERIC;
+        token.type = TokenType::LITERAL;
+        token.subType = TokenSubType::NUMERIC;
     }
     else
     {
+        token.type = TokenType::IDENTIFIER;
+
         // Report Error, an identifier cannot start with a value thats not an alpha or underscore
         char tmp = input[0];
         if (!IsAlpha(tmp) && tmp != '_')
@@ -132,49 +135,51 @@ TokenType Lexer::ResolveTokenType(LexerFile& file, std::string_view& input)
         if (file.tokens.size() != 0)
         {
             Token& prevToken = file.GetToken(file.tokens.size() - 1);
-            if (prevToken.type == TokenType::KEYWORD_FUNCTION)
+            if (prevToken.subType == TokenSubType::KEYWORD_FUNCTION)
             {
-                type = TokenType::FUNCTION_DECLARATION;
+                token.subType = TokenSubType::FUNCTION_DECLARATION;
             }
-            else if (prevToken.type == TokenType::KEYWORD_STRUCT)
+            else if (prevToken.subType == TokenSubType::KEYWORD_STRUCT)
             {
-                type = TokenType::STRUCT;
+                token.type = TokenType::STRUCT;
+                token.subType = TokenSubType::NONE;
             }
-            else if (prevToken.type == TokenType::KEYWORD_ENUM)
+            else if (prevToken.subType == TokenSubType::KEYWORD_ENUM)
             {
-                type = TokenType::ENUM;
+                token.type = TokenType::ENUM;
+                token.subType = TokenSubType::NONE;
             }
-            else if (prevToken.type == TokenType::OP_RETURN_TYPE || prevToken.type == TokenType::OP_DECLARATION || prevToken.type == TokenType::OP_CONST_DECLARATION)
+            else if (prevToken.subType == TokenSubType::OP_RETURN_TYPE || (prevToken.type == TokenType::DECLARATION && prevToken.subType == TokenSubType::NONE) || prevToken.subType == TokenSubType::CONST_DECLARATION)
             {
-                type = TokenType::DATATYPE;
+                token.type = TokenType::DATATYPE;
+                token.subType = TokenSubType::NONE;
             }
         }
     }
-
-    return type;
 }
 void Lexer::ResolveOperator(LexerFile& file, Token& token)
 {
     long originalBufferPos = file.bufferPosition;
     long nextCharPosition = file.bufferPosition + 1;
 
-    if (token.type == TokenType::OP_DECLARATION)
+    if (token.type == TokenType::DECLARATION)
     {
-        if (file.buffer[nextCharPosition] == OP_DECLARATION)
+        if (file.buffer[nextCharPosition] == DECLARATION)
         {
-            token.value += OP_DECLARATION;
-            token.type = TokenType::OP_CONST_DECLARATION;
+            token.value += DECLARATION;
+            token.subType = TokenSubType::CONST_DECLARATION;
             file.bufferPosition += 1;
+            nextCharPosition += 1;
         }
 
         if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
 
-            if (token.type == TokenType::OP_DECLARATION)
-                token.type = TokenType::OP_DECLARATION_ASSIGN;
+            if (token.subType == TokenSubType::CONST_DECLARATION)
+                token.subType = TokenSubType::CONST_DECLARATION_ASSIGN;
             else
-                token.type = TokenType::OP_CONST_DECLARATION_ASSIGN;
+                token.subType = TokenSubType::DECLARATION_ASSIGN;
 
             file.bufferPosition += 1;
         }
@@ -184,7 +189,7 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_EQUALS;
+            token.subType = TokenSubType::OP_EQUALS;
             file.bufferPosition += 1;
         }
     }
@@ -193,7 +198,7 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_NOT_EQUALS;
+            token.subType = TokenSubType::OP_NOT_EQUALS;
             file.bufferPosition += 1;
         }
     }
@@ -202,13 +207,13 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_ADD_ASSIGN;
+            token.subType = TokenSubType::OP_ADD_ASSIGN;
             file.bufferPosition += 1;
         }
         else if (file.buffer[nextCharPosition] == OP_ADD)
         {
             token.value += OP_ADD;
-            token.type = TokenType::OP_INCREMENT;
+            token.subType = TokenSubType::OP_INCREMENT;
             file.bufferPosition += 1;
         }
     }
@@ -217,19 +222,19 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_SUBTRACT_ASSIGN;
+            token.subType = TokenSubType::OP_SUBTRACT_ASSIGN;
             file.bufferPosition += 1;
         }
         else if (file.buffer[nextCharPosition] == OP_GREATER)
         {
             token.value += OP_GREATER;
-            token.type = TokenType::OP_RETURN_TYPE;
+            token.subType = TokenSubType::OP_RETURN_TYPE;
             file.bufferPosition += 1;
         }
         else if (file.buffer[nextCharPosition] == OP_SUBTRACT)
         {
             token.value += OP_SUBTRACT;
-            token.type = TokenType::OP_DECREMENT;
+            token.subType = TokenSubType::OP_DECREMENT;
             file.bufferPosition += 1;
         }
     }
@@ -238,7 +243,7 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_MULTIPLY_ASSIGN;
+            token.subType = TokenSubType::OP_MULTIPLY_ASSIGN;
             file.bufferPosition += 1;
         }
     }
@@ -247,7 +252,7 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_DIVIDE_ASSIGN;
+            token.subType = TokenSubType::OP_DIVIDE_ASSIGN;
             file.bufferPosition += 1;
         }
     }
@@ -256,13 +261,13 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_GREATER_EQUALS;
+            token.subType = TokenSubType::OP_GREATER_EQUALS;
             file.bufferPosition += 1;
         }
         else if (file.buffer[nextCharPosition] == OP_GREATER)
         {
             token.value += OP_GREATER;
-            token.type = TokenType::OP_BITWISE_SHIFT_RIGHT;
+            token.subType = TokenSubType::OP_BITWISE_SHIFT_RIGHT;
             file.bufferPosition += 1;
         }
     }
@@ -271,13 +276,13 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_LESS_EQUALS;
+            token.subType = TokenSubType::OP_LESS_EQUALS;
             file.bufferPosition += 1;
         }
         else if (file.buffer[nextCharPosition] == OP_LESS)
         {
             token.value += OP_LESS;
-            token.type = TokenType::OP_BITWISE_SHIFT_LEFT;
+            token.subType = TokenSubType::OP_BITWISE_SHIFT_LEFT;
             file.bufferPosition += 1;
         }
     }
@@ -286,13 +291,13 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_BITWISE_AND)
         {
             token.value += OP_BITWISE_AND;
-            token.type = TokenType::OP_AND;
+            token.subType = TokenSubType::OP_AND;
             file.bufferPosition += 1;
         }
         else if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_BITWISE_AND_ASSIGN;
+            token.subType = TokenSubType::OP_BITWISE_AND_ASSIGN;
             file.bufferPosition += 1;
         }
     }
@@ -301,13 +306,13 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         if (file.buffer[nextCharPosition] == OP_BITWISE_OR)
         {
             token.value += OP_BITWISE_OR;
-            token.type = TokenType::OP_OR;
+            token.subType = TokenSubType::OP_OR;
             file.bufferPosition += 1;
         }
         else if (file.buffer[nextCharPosition] == OP_ASSIGN)
         {
             token.value += OP_ASSIGN;
-            token.type = TokenType::OP_BITWISE_OR_ASSIGN;
+            token.subType = TokenSubType::OP_BITWISE_OR_ASSIGN;
             file.bufferPosition += 1;
         }
     }
@@ -316,51 +321,51 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
     if (newBufferPos != file.bufferPosition)
         file.colNum += newBufferPos;
 }
-void Lexer::ResolveKeyword(std::string_view& str, TokenType& type)
+void Lexer::ResolveKeyword(std::string_view& str, TokenSubType& type)
 {
     if (str == KEYWORD_FUNCTION)
     {
-        type = TokenType::KEYWORD_FUNCTION;
+        type = TokenSubType::KEYWORD_FUNCTION;
     }
     else if (str == KEYWORD_STRUCT)
     {
-        type = TokenType::KEYWORD_STRUCT;
+        type = TokenSubType::KEYWORD_STRUCT;
     }
     else if (str == KEYWORD_ENUM)
     {
-        type = TokenType::KEYWORD_ENUM;
+        type = TokenSubType::KEYWORD_ENUM;
     }
     else if (str == KEYWORD_WHILE)
     {
-        type = TokenType::KEYWORD_WHILE;
+        type = TokenSubType::KEYWORD_WHILE;
     }
     else if (str == KEYWORD_IF)
     {
-        type = TokenType::KEYWORD_IF;
+        type = TokenSubType::KEYWORD_IF;
     }
     else if (str == KEYWORD_FOR)
     {
-        type = TokenType::KEYWORD_FOR;
+        type = TokenSubType::KEYWORD_FOR;
     }
     else if (str == KEYWORD_TRUE)
     {
-        type = TokenType::KEYWORD_TRUE;
+        type = TokenSubType::KEYWORD_TRUE;
     }
     else if (str == KEYWORD_FALSE)
     {
-        type = TokenType::KEYWORD_FALSE;
+        type = TokenSubType::KEYWORD_FALSE;
     }
     else if (str == KEYWORD_BREAK)
     {
-        type = TokenType::KEYWORD_BREAK;
+        type = TokenSubType::KEYWORD_BREAK;
     }
     else if (str == KEYWORD_CONTINUE)
     {
-        type = TokenType::KEYWORD_CONTINUE;
+        type = TokenSubType::KEYWORD_CONTINUE;
     }
     else if (str == KEYWORD_RETURN)
     {
-        type = TokenType::KEYWORD_RETURN;
+        type = TokenSubType::KEYWORD_RETURN;
     }
 }
 
@@ -544,7 +549,7 @@ void Lexer::ExtractTokens(LexerFile& file)
         auto itr = _operatorCharToTypeMap.find(tmp);
         if (itr != _operatorCharToTypeMap.end())
         {
-            if (tmp == OP_ACCESS)
+            if (tmp == ACCESS)
             {
                 char lastChar = file.buffer[file.bufferPosition - 1];
                 if (IsDigit(lastChar))
@@ -566,8 +571,11 @@ void Lexer::ExtractTokens(LexerFile& file)
                 Token token;
                 token.lineNum = file.lineNum;
                 token.colNum = file.colNum;
-                token.type = ResolveTokenType(file, tokenStr);
+                token.type = TokenType::NONE;
+                token.subType = TokenSubType::NONE;
                 token.value = tokenStr;
+
+                ResolveTokenTypes(file, tokenStr, token);
                 file.tokens.push_back(token);
 
                 file.colNum += tmpSize;
@@ -578,6 +586,7 @@ void Lexer::ExtractTokens(LexerFile& file)
             token.colNum = file.colNum++;
             token.value = itr->first;
             token.type = itr->second;
+            token.subType = TokenSubType::NONE;
 
             // ResolveOperator will correct the "Type" of the Token if needed
             ResolveOperator(file, token);
@@ -590,12 +599,11 @@ void Lexer::ExtractTokens(LexerFile& file)
                     Token& prevToken = file.GetToken(file.tokens.size() - 1);
 
                     if (prevToken.type == TokenType::IDENTIFIER)
-                        prevToken.type = TokenType::FUNCTION_CALL;
+                        prevToken.subType = TokenSubType::FUNCTION_CALL;
                 }
             }
 
             file.tokens.push_back(token);
-
             lastOperatorIndex = file.bufferPosition + 1;
         }
     }
@@ -608,8 +616,11 @@ void Lexer::ExtractTokens(LexerFile& file)
         Token token;
         token.lineNum = file.lineNum;
         token.colNum = file.colNum;
-        token.type = ResolveTokenType(file, tokenStr);
+        token.type = TokenType::NONE;
+        token.subType = TokenSubType::NONE;
         token.value = tokenStr;
+
+        ResolveTokenTypes(file, tokenStr, token);
         file.tokens.push_back(token);
 
         file.colNum += tmpSize;
