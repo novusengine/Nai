@@ -10,6 +10,8 @@
 
 int UnitTester::UnitTest(const std::string& fileName, const std::string& outputPath)
 {
+    ZoneScoped;
+
     std::cout << "Unit test " << fileName;
 
     std::string testResult;
@@ -72,6 +74,8 @@ int UnitTester::UnitTest(const std::string& fileName, const std::string& outputP
 
 void UnitTester::CreateResultFile(bool succeeded, const std::string& outputPath, const std::string& testResult, const std::string& expectedResult)
 {
+    ZoneScoped;
+
     std::ofstream output(outputPath);
     output << "Test " << ((succeeded) ? "SUCCEEDED" : "FAILED") << std::endl << std::endl;
     output << "Lexer test result: " << std::endl;

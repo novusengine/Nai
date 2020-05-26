@@ -35,5 +35,6 @@
 bin/
 build/
 
-# Exceptions for premake executables
+# Exceptions
 !premake/windows/premake5.exe
+!dep/tracy/windows/Tracy.exe

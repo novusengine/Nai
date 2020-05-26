@@ -15,3 +15,9 @@
 #ifndef NAI_RELEASE
 #error("NAI_RELEASE was not defined to either 0 or 1!");
 #endif
+
+#ifdef TRACY_ENABLE
+#define TRACY_NO_EXIT
+#endif
+
+#include <Tracy.hpp>

@@ -3,6 +3,8 @@
 
 void Parser::Init()
 {
+    ZoneScoped;
+
     _rules =
     {
         { TokenType::NTS_START,
@@ -69,6 +71,8 @@ void Parser::Init()
 
 void Parser::Process(ParserFile& parserFile)
 {
+    ZoneScoped;
+
     // File have no tokens to parse
     if (parserFile.lexerOutput.tokens.size() == 0)
         return;
@@ -87,6 +91,8 @@ void Parser::Process(ParserFile& parserFile)
 
 bool Parser::CheckSyntax(ParserFile& file)
 {
+    ZoneScoped;
+
     assert(file.stack.size() == 0);
     size_t index = 0;
     
@@ -439,4 +445,5 @@ bool Parser::CheckSyntax(ParserFile& file)
 
 void Parser::BuildAST(ParserFile&)
 {
+    ZoneScoped;
 }

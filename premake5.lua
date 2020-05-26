@@ -25,14 +25,14 @@ project (PROJECT_NAME)
     warnings "Extra"
     floatingpoint "Fast"
     entrypoint "mainCRTStartup"
-    includedirs { "source" }
+    includedirs { "source", "dep/tracy" }
     pchheader "pch/Build.h"
     pchsource "source/pch/Build.cpp"
 
     postbuildmessage "Removing '%{OUTPUT_BASE_PATH}\\testresults' to fix unittests"
     postbuildcommands { "rmdir /Q /S %{OUTPUT_BASE_PATH}\\testresults" }
 
-    files { "source/**.h", "source/**.hpp", "source/**.cpp" }
+    files { "source/**.h", "source/**.hpp", "source/**.cpp", "dep/tracy/TracyClient.cpp" }
     flags { "MultiProcessorCompile" }
     
     filter "configurations:Debug"

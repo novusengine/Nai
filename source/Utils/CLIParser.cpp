@@ -3,10 +3,13 @@
 
 CLIParser::CLIParser()
 {
+    ZoneScoped;
 }
 
 CLIValues CLIParser::ParseArguments(int argc, char* argv[])
 {
+    ZoneScoped;
+
     CLIValues cliValues;
 
     // First we initialize the defaults
@@ -133,6 +136,8 @@ CLIValues CLIParser::ParseArguments(int argc, char* argv[])
 
 void CLIParser::PrintHelp()
 {
+    ZoneScoped;
+
     std::cout << "Available arguments: " << std::endl << std::endl;
 
     for (const CLIParameter& parameter : _requiredParameters)

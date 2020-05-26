@@ -90,7 +90,10 @@ class Token
 public:
     TokenType type = TokenType::NONE;
     TokenSubType subType = TokenSubType::NONE;
-    std::string value = "";
+    
+    char* value;
+    int valueSize;
+
     int lineNum;
     int colNum;
 

@@ -2,14 +2,18 @@
 #include <pch/Build.h>
 #include <string>
 #include <vector>
-#include <unordered_map>
 #include <cassert>
+#include <robin_hood.h>
 
 #include "Token.h"
 
 struct LexerFile
 {
-    LexerFile(char* inBuffer, long inSize) : buffer(inBuffer), size(inSize), tokens() { tokens.reserve(1024); }
+    LexerFile(char* inBuffer, long inSize) : buffer(inBuffer), size(inSize), tokens() 
+    {
+        // @TODO: Find a "smarter way?" Right now we assume 1 character is 1 token as a minimum
+        tokens.reserve(inSize / 2);
+    }
 
     char* buffer = nullptr;
     long size = 0;
@@ -31,22 +35,21 @@ public:
     void Init();
     void Process(LexerFile& file);
 
-    bool IsAlpha(char c);
-    bool IsDigit(char c);
-    bool IsNumeric(std::string_view& str);
-    bool IsKeyword(std::string_view& str);
+    inline bool IsAlpha(char c);
+    inline bool IsDigit(char c);
+    inline bool IsNumeric(Token& token);
+    inline bool HandleKeyword(Token& token);
 
-    void ResolveTokenTypes(LexerFile& file, std::string_view& input, Token& token);
-    void ResolveOperator(LexerFile& file, Token& token);
-    void ResolveKeyword(std::string_view& str, TokenSubType& type);
+    inline void ResolveTokenTypes(LexerFile& file, Token& token);
+    inline void ResolveOperator(LexerFile& file, Token& token);
 
-    void SkipComment(LexerFile& file);
-    void ResolveMultilineComment(LexerFile& file);
-    long SkipWhitespaceOrNewline(LexerFile& file, long bufferPos = defaultBufferPosition);
-    long FindNextWhitespaceOrNewline(LexerFile& file, long bufferPos = defaultBufferPosition);
+    inline void SkipComment(LexerFile& file);
+    inline void ResolveMultilineComment(LexerFile& file);
+    inline long SkipWhitespaceOrNewline(LexerFile& file, long bufferPos = defaultBufferPosition);
+    inline long FindNextWhitespaceOrNewline(LexerFile& file, long bufferPos = defaultBufferPosition);
 
-    void ExtractTokens(LexerFile& file);
-    void ProcessTokens(LexerFile& file);
+    inline void ExtractTokens(LexerFile& file);
+    inline void ProcessTokens(LexerFile& file);
 
     template<typename... Args>
     void ReportError(int errorCode, std::string str, Args... args)
@@ -65,8 +68,9 @@ private:
     const static int defaultBufferPosition = -1;
     int totalLineNum;
 
-    std::unordered_map<char, TokenType> _operatorCharToTypeMap; // TODO: Move this to something faster (Char -> Token_Type)
+    robin_hood::unordered_map<char, TokenType> _operatorCharToTypeMap; // TODO: Move this to something faster (Char -> Token_Type)
 
+    // Changing a Keyword requires modifications in (HandleKeyword), this is due to an optimization
     const char* KEYWORD_FUNCTION = "fn";
     const char* KEYWORD_STRUCT = "struct";
     const char* KEYWORD_ENUM = "enum";

@@ -8,8 +8,25 @@
 #include "UnitTester/UnitTester.h"
 #include "Utils/CLIParser.h"
 
+#ifdef TRACY_ENABLE
+void* operator new(std::size_t count)
+{
+    auto ptr = malloc(count);
+    TracyAlloc(ptr, count);
+    return ptr;
+}
+void operator delete(void* ptr) noexcept
+{
+    TracyFree(ptr);
+    free(ptr);
+}
+
+#endif
+
 int Compile(const std::string& fileName)
 {
+    ZoneScoped;
+
     Lexer lexer;
     lexer.Init();
 
@@ -35,12 +52,20 @@ int Compile(const std::string& fileName)
                 LexerFile lexerFile(buffer, static_cast<long>(readSize));
                 lexer.Process(lexerFile);
 
+                std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+                std::cout << "Lexer took " << time_span.count() << " seconds.\n";
+
+                // Time Parsing
+                t1 = std::chrono::high_resolution_clock::now();
+
                 ParserFile parserFile(lexerFile);
                 parser.Process(parserFile);
 
-                std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-                std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-                std::cout << "Lexer/Parsing took " << time_span.count() << " seconds.";
+                t2 = std::chrono::high_resolution_clock::now();
+                time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+                std::cout << "Parsing took " << time_span.count() << " seconds.\n";
+
                 std::cout << std::endl;
 
                 std::string code = Lexer::UnitTest_TokensToCode(lexerFile.GetTokens());
@@ -55,6 +80,8 @@ int Compile(const std::string& fileName)
 
 int main(int argc, char* argv[])
 {
+    ZoneScoped;
+
     CLIParser cliParser; // Default implicit parameters are "executable" which gets the path to the current executable, and "filename" which gets the file we're acting on
 
     cliParser.AddParameter("unittest", "Runs a unittest on the file")
