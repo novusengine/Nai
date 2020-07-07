@@ -68,7 +68,7 @@ private:
     const static int defaultBufferPosition = -1;
     int totalLineNum;
 
-    robin_hood::unordered_map<char, TokenType> _operatorCharToTypeMap; // TODO: Move this to something faster (Char -> Token_Type)
+    robin_hood::unordered_map<char, TokenType> _operatorCharToTypeMap;
 
     // Changing a Keyword requires modifications in (HandleKeyword), this is due to an optimization
     const char* KEYWORD_FUNCTION = "fn";

@@ -62,7 +62,7 @@
 
 #endif
 
-#ifdef NAI_CLANG
+#if NAI_CLANG
 #pragma clang diagnostic push
 #endif
 

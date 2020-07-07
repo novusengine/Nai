@@ -238,6 +238,7 @@ void Lexer::ResolveTokenTypes(LexerFile& file, Token& token)
     }
     else
     {
+        ZoneScopedN("Resolve Identifier")
         token.type = TokenType::IDENTIFIER;
 
         // Report Error, an identifier cannot start with a value thats not an alpha or underscore
@@ -305,7 +306,6 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
             }
             break;
         }
-
         case TokenType::OP_ASSIGN:
         {
             if (file.buffer[nextCharPosition] == OP_ASSIGN)
@@ -579,7 +579,7 @@ long Lexer::FindNextWhitespaceOrNewline(LexerFile& file, long bufferPos /* = def
 
         if (tmp == STRING_SYMBOL)
         {
-            // Here we check handle checking for strings, as such that we don't accidentally detect a space or newline within a string as a valid symbol
+            // Here we handle checking for strings, as such that we don't accidentally detect a space or newline within a string as a token
             if (!stringFound)
             {
                 stringFound = true;
@@ -642,10 +642,12 @@ void Lexer::ExtractTokens(LexerFile& file)
     long lastOperatorIndex = file.bufferPosition;
 
     {
-        ZoneScopedN("Resolve Token")
+        ZoneScopedN("Iterator")
 
         for (; file.bufferPosition < endPos; file.bufferPosition++)
         {
+            ZoneScopedN("Iteration")
+
             char tmp = file.buffer[file.bufferPosition];
 
             auto itr = _operatorCharToTypeMap.find(tmp);
