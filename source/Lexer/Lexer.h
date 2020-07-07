@@ -76,6 +76,8 @@ private:
     const char* KEYWORD_ENUM = "enum";
     const char* KEYWORD_WHILE = "while";
     const char* KEYWORD_IF = "if";
+    const char* KEYWORD_ELSEIF = "elseif";
+    const char* KEYWORD_ELSE = "else";
     const char* KEYWORD_FOR = "for";
     const char* KEYWORD_TRUE = "true";
     const char* KEYWORD_FALSE = "false";

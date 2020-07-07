@@ -35,13 +35,23 @@ enum class TokenType
 
     // Non Terminal Symbols
     NTS_START,
+    NTS_BODY,
     NTS_DECLARATION,
     NTS_DECLARATION_TERMINATOR,
     NTS_VALUE,
     NTS_EXPRESSION,
+    NTS_EXPRESSION_RECURSIVE,
     NTS_EXPRESSION_SEQUENCE,
+    NTS_ARGUMENT_LIST,
+    NTS_ARGUMENT_DECLARATION,
+    NTS_ARGUMENT_DECLARATION_SEQUENCE,
+    NTS_ARGUMENT_TERMINATOR,
     NTS_PARAMETER_LIST,
     NTS_PARAMETER_TERMINATOR,
+    NTS_STRUCT_MEMBER,
+    NTS_ENUM_MEMBER,
+    NTS_ENUM_TERMINATOR,
+    NTS_IF_TERMINATOR,
     NTS_RETURN_TYPE
 };
 
@@ -54,6 +64,8 @@ enum class TokenSubType
     KEYWORD_ENUM,
     KEYWORD_WHILE,
     KEYWORD_IF,
+    KEYWORD_ELSEIF,
+    KEYWORD_ELSE,
     KEYWORD_FOR,
     KEYWORD_TRUE,
     KEYWORD_FALSE,
@@ -103,6 +115,9 @@ public:
             subType >= TokenSubType::OP_EQUALS &&
             subType <= TokenSubType::OP_BITWISE_SHIFT_LEFT)
             return true;
+
+        if (type == TokenType::OP_ASSIGN && subType == TokenSubType::NONE)
+            return false;
 
         if (type >= TokenType::OP_NOT &&
             type <= TokenType::OP_BITWISE_OR)

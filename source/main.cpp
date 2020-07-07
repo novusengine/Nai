@@ -68,7 +68,7 @@ int Compile(const std::string& fileName)
 
                 std::cout << std::endl;
 
-                std::string code = Lexer::UnitTest_TokensToCode(lexerFile.GetTokens());
+                //std::string code = Lexer::UnitTest_TokensToCode(lexerFile.GetTokens());
             }
         }
 

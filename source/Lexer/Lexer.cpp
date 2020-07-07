@@ -149,6 +149,10 @@ bool Lexer::HandleKeyword(Token& token)
             {
                 token.subType = TokenSubType::KEYWORD_TRUE;
             }
+            else if (strncmp(token.value, KEYWORD_ELSE, token.valueSize) == 0)
+            {
+                token.subType = TokenSubType::KEYWORD_ELSE;
+            }
             else
             {
                 return false;
@@ -188,6 +192,10 @@ bool Lexer::HandleKeyword(Token& token)
             else if (strncmp(token.value, KEYWORD_STRUCT, token.valueSize) == 0)
             {
                 token.subType = TokenSubType::KEYWORD_STRUCT;
+            }
+            else if (strncmp(token.value, KEYWORD_ELSEIF, token.valueSize) == 0)
+            {
+                token.subType = TokenSubType::KEYWORD_ELSEIF;
             }
             else
             {
@@ -696,14 +704,14 @@ void Lexer::ExtractTokens(LexerFile& file)
                 // ResolveOperator will correct the "Type" of the Token if needed
                 ResolveOperator(file, token);
 
-                // This will resolve the "FUNCTION_CALL" type
+                // This will resolve the "FUNCTION_CALL" type (We could potentially move this into ResolveOperator, but it feels wrong)
                 if (token.type == TokenType::LPAREN)
                 {
                     if (file.tokens.size() != 0)
                     {
                         Token& prevToken = file.GetToken(file.tokens.size() - 1);
 
-                        if (prevToken.type == TokenType::IDENTIFIER)
+                        if (prevToken.type == TokenType::IDENTIFIER && prevToken.subType != TokenSubType::FUNCTION_DECLARATION)
                             prevToken.subType = TokenSubType::FUNCTION_CALL;
                     }
                 }
