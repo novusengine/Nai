@@ -4,6 +4,8 @@
 
 #include "Lexer/Lexer.h"
 #include "Parser/Parser.h"
+#include "ByteCode/BCGenerator.h"
+#include "ByteCode/BCVM.h"
 
 #include "UnitTester/UnitTester.h"
 #include "Utils/CLIParser.h"
@@ -59,7 +61,7 @@ int Compile(const std::string& fileName)
                 // Time Parsing
                 t1 = std::chrono::high_resolution_clock::now();
 
-                ParserFile parserFile(lexerFile);
+                ModuleParser parserFile(lexerFile);
                 parser.Process(parserFile);
 
                 t2 = std::chrono::high_resolution_clock::now();
@@ -67,6 +69,12 @@ int Compile(const std::string& fileName)
                 std::cout << "Parsing took " << time_span.count() << " seconds.\n";
 
                 std::cout << std::endl;
+
+                BCGenerator bcGenerator(parserFile);
+                bcGenerator.Generate();
+
+                BCVM bcVM(parserFile);
+                bcVM.Run();
 
                 //std::string code = Lexer::UnitTest_TokensToCode(lexerFile.GetTokens());
             }

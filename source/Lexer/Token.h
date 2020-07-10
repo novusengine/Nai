@@ -109,7 +109,17 @@ public:
     int lineNum;
     int colNum;
 
-    bool IsExpressionOperator()
+    bool IsOperator() const
+    {
+        if (type == TokenType::OPERATOR)
+            return true;
+
+        if (type >= TokenType::OP_NOT && type <= TokenType::OP_BITWISE_OR)
+            return true;
+
+        return false;
+    }
+    bool IsExpressionOperator() const
     {
         if (type == TokenType::OPERATOR &&
             subType >= TokenSubType::OP_EQUALS &&

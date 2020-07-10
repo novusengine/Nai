@@ -69,7 +69,7 @@ std::string Token::TypeToString(TokenType type)
 {
     switch (type)
     {
-    /*case TokenType::OP_NOT:
+    case TokenType::OP_NOT:
         return OP_NOT;
     case TokenType::OP_MODULUS:
         return OP_MODULUS;
@@ -81,12 +81,6 @@ std::string Token::TypeToString(TokenType type)
         return OP_ADD;
     case TokenType::OP_SUBTRACT:
         return OP_SUBTRACT;
-    case TokenType::OP_ACCESS:
-        return OP_ACCESS;
-    case TokenType::OP_DIVIDE:
-        return OP_DIVIDE;
-    case TokenType::OP_DECLARATION:
-        return OP_DECLARATION;
     case TokenType::OP_LESS:
         return OP_LESS;
     case TokenType::OP_ASSIGN:
@@ -95,7 +89,13 @@ std::string Token::TypeToString(TokenType type)
         return OP_GREATER;
     case TokenType::OP_BITWISE_OR:
         return OP_BITWISE_OR;
-    case TokenType::OP_DECLARATION_ASSIGN:
+    case TokenType::OP_DIVIDE:
+        return OP_DIVIDE;
+    case TokenType::ACCESS:
+        return ACCESS;
+    case TokenType::DECLARATION:
+        return DECLARATION;
+    /*case TokenType::OP_DECLARATION_ASSIGN:
         return OP_DECLARATION_ASSIGN;
     case TokenType::OP_CONST_DECLARATION:
         return OP_CONST_DECLARATION;

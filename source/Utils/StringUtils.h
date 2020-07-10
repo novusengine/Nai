@@ -1,3 +1,4 @@
+#pragma once
 #include <pch/Build.h>
 #include <sstream>
 #include <string>
@@ -31,6 +32,18 @@ namespace StringUtils
         }
 
         return results;
+    }
+
+    inline uint64_t ToUInt64(const char* value, int size) 
+    {
+        uint64_t result = 0;
+
+        char const* p = value;
+        char const* q = p + size;
+        while (p < q) {
+            result = (result << 1) + (result << 3) + *(p++) - '0';
+        }
+        return result;
     }
 
     // FNV-1a 32bit hashing algorithm.

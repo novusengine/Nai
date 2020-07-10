@@ -227,15 +227,7 @@ void Lexer::ResolveTokenTypes(LexerFile& file, Token& token)
 {
     ZoneScoped;
 
-    if (token.value[0] == STRING_SYMBOL)
-    {
-        token.value += 1;
-        token.valueSize -= 1;
-
-        token.type = TokenType::LITERAL;
-        token.subType = TokenSubType::STRING;
-    }
-    else if (HandleKeyword(token))
+    if (HandleKeyword(token))
     {
         token.type = TokenType::KEYWORD;
     }
@@ -657,6 +649,44 @@ void Lexer::ExtractTokens(LexerFile& file)
             ZoneScopedN("Iteration")
 
             char tmp = file.buffer[file.bufferPosition];
+
+            // Handle Strings here
+            if (tmp == STRING_SYMBOL)
+            {      
+                Token token;
+                token.lineNum = file.lineNum;
+                token.colNum = file.colNum;
+                token.type = TokenType::LITERAL;
+                token.subType = TokenSubType::STRING;
+                token.value = &file.buffer[lastOperatorIndex];
+
+                // Skip initial String Symbol
+                token.value += 1;
+
+                // Find next string symbol (We skip it)
+                uint32_t index = 0;
+                while (true)
+                {
+                    char& c = token.value[index];
+
+                    // We found the end of the string (This is where we'd potentially want to handle Escaped Backslashes
+                    if (c == STRING_SYMBOL)
+                        break;
+
+                    if (c == NEWLINE)
+                        file.lineNum += 1;
+
+                    index += 1;
+                }
+
+                token.valueSize = index;
+                file.tokens.push_back(token);
+
+                file.colNum += index + 2; // + 2 here to skip the starting STRING_SYMBOL
+                file.bufferPosition += index + 1; // + 1 here to skip the starting STRING_SYMBOL (The ending STRING_SYMBOL is skipped by the for loop iterator)
+                lastOperatorIndex = file.bufferPosition + 1; // + 1 here to skip the ending STRING_SYMBOL
+                continue;
+            }
 
             auto itr = _operatorCharToTypeMap.find(tmp);
             if (itr != _operatorCharToTypeMap.end())
