@@ -1,1632 +1,1371 @@
 #include <pch/Build.h>
 #include "Parser.h"
-#include "AST.h"
+#include "../Memory/BlockAllocator.h"
+#include <limits>
 
+thread_local Memory::BlockAllocator allocator(64 * 1024 * 1024); // Preallocate 64 MB per thread
 
-void Parser::Init()
+ASTSequence* ModuleInfo::GetSequence()
 {
-    ZoneScoped;
-
-    _rules =
-    {
-        { TokenType::NTS_START,
-            {
-                { TokenType::KEYWORD, 1 }
-            }
-        },
-        { TokenType::NTS_BODY,
-            {
-                { TokenType::IDENTIFIER, 1 },
-                { TokenType::KEYWORD, 2 },
-                { TokenType::RBRACE, 3 }
-            }
-        },
-        { TokenType::NTS_DECLARATION,
-            {
-                { TokenType::DECLARATION, 1 }
-            }
-        },
-        { TokenType::NTS_DECLARATION_TERMINATOR,
-            {
-                { TokenType::OP_ASSIGN, 1 },
-                { TokenType::END_OF_LINE, 2 }
-            }
-        },
-        { TokenType::NTS_VALUE,
-            {
-                { TokenType::IDENTIFIER, 1 },
-                { TokenType::LITERAL, 2 },
-                { TokenType::KEYWORD, 2 }
-            }
-        },
-        { TokenType::NTS_EXPRESSION,
-            {
-                { TokenType::IDENTIFIER, 1 },
-                { TokenType::LITERAL, 2 },
-                { TokenType::KEYWORD, 3 },
-                { TokenType::OP_NOT, 4 },
-                { TokenType::LPAREN, 5 }
-            }
-        },
-        { TokenType::NTS_EXPRESSION_RECURSIVE,
-            {
-                { TokenType::IDENTIFIER, 1 },
-                { TokenType::LITERAL, 2 },
-                { TokenType::KEYWORD, 3 },
-                { TokenType::OP_NOT, 4 },
-                { TokenType::LPAREN, 5 }
-            }
-        },
-        { TokenType::NTS_EXPRESSION_SEQUENCE,
-            {
-                { TokenType::OPERATOR, 1 },
-                { TokenType::OP_MODULUS, 1 },
-                { TokenType::OP_BITWISE_AND, 1 },
-                { TokenType::OP_MULTIPLY, 1 },
-                { TokenType::OP_ADD, 1 },
-                { TokenType::OP_SUBTRACT, 1 },
-                { TokenType::OP_DIVIDE, 1 },
-                { TokenType::OP_LESS, 1 },
-                { TokenType::OP_GREATER, 1 },
-                { TokenType::OP_BITWISE_OR, 1 },
-                { TokenType::LPAREN, 2 },
-                { TokenType::RPAREN, 2 },
-                { TokenType::END_OF_LINE, 2 }
-            }
-        },
-        { TokenType::NTS_ARGUMENT_LIST,
-            {
-                { TokenType::LPAREN, 1 }
-            }
-        },
-        { TokenType::NTS_ARGUMENT_DECLARATION,
-            {
-                { TokenType::DECLARATION, 1 }
-            }
-        },
-        { TokenType::NTS_ARGUMENT_DECLARATION_SEQUENCE,
-            {
-                { TokenType::OP_ASSIGN, 1 },
-                { TokenType::PARAM_SEPERATOR, 2 },
-                { TokenType::RPAREN, 3 }
-            }
-        },
-        { TokenType::NTS_ARGUMENT_TERMINATOR,
-            {
-                { TokenType::PARAM_SEPERATOR, 1 },
-                { TokenType::RPAREN, 2 }
-            }
-        },
-        { TokenType::NTS_PARAMETER_LIST,
-            {
-                { TokenType::LPAREN, 1 }
-            }
-        },
-        { TokenType::NTS_PARAMETER_TERMINATOR,
-            {
-                { TokenType::OPERATOR, 1 },
-                { TokenType::OP_MODULUS, 1 },
-                { TokenType::OP_BITWISE_AND, 1 },
-                { TokenType::OP_MULTIPLY, 1 },
-                { TokenType::OP_ADD, 1 },
-                { TokenType::OP_SUBTRACT, 1 },
-                { TokenType::OP_DIVIDE, 1 },
-                { TokenType::OP_LESS, 1 },
-                { TokenType::OP_GREATER, 1 },
-                { TokenType::OP_BITWISE_OR, 1 },
-                { TokenType::PARAM_SEPERATOR, 2 },
-                { TokenType::RPAREN, 3 }
-            }
-        },
-        { TokenType::NTS_STRUCT_MEMBER,
-            {
-                { TokenType::IDENTIFIER, 1 },
-                { TokenType::KEYWORD, 2 },
-                { TokenType::RBRACE, 3 }
-            }
-        },
-        { TokenType::NTS_ENUM_MEMBER,
-            {
-                { TokenType::IDENTIFIER, 1 },
-                { TokenType::RBRACE, 2 }
-            }
-        },
-        { TokenType::NTS_ENUM_TERMINATOR,
-            {
-                { TokenType::PARAM_SEPERATOR, 1 },
-                { TokenType::RBRACE, 2 }
-            }
-        },
-        { TokenType::NTS_IF_TERMINATOR,
-            {
-                { TokenType::KEYWORD, 1 },
-                { TokenType::RBRACE, 2 },
-                { TokenType::NTS_BODY, 2 }
-            }
-        },
-        { TokenType::NTS_RETURN_TYPE,
-            {
-                { TokenType::OP_SUBTRACT, 1 },
-                { TokenType::LBRACE, 2 }
-            }
-        }
-    };
-
-    // Setup Default Return Type Token
-    defaultReturnTypeToken->type = TokenType::DATATYPE;
-    defaultReturnTypeToken->value = defaultReturnTypeName.data();
-    defaultReturnTypeToken->valueSize = 4;
-
-    // Setup Infer Type Token
-    inferTypeToken->type = TokenType::DATATYPE;
-    inferTypeToken->value = inferTypeName.data();
-    inferTypeToken->valueSize = 4;
+    ZoneScopedNC("ModuleInfo::GetSequence", tracy::Color::Aquamarine)
+    return allocator.New<ASTSequence>();
+}
+ASTExpression* ModuleInfo::GetExpression()
+{
+    ZoneScopedNC("ModuleInfo::GetExpression", tracy::Color::Aquamarine1)
+    return allocator.New<ASTExpression>();
+}
+ASTValue* ModuleInfo::GetValue()
+{
+    ZoneScopedNC("ModuleInfo::GetValue", tracy::Color::Aquamarine2)
+    return allocator.New<ASTValue>();
+}
+ASTVariable* ModuleInfo::GetVariable()
+{
+    ZoneScopedNC("ModuleInfo::GetVariable", tracy::Color::Aquamarine2)
+    return allocator.New<ASTVariable>();
+}
+ASTDataType* ModuleInfo::GetDataType()
+{
+    ZoneScopedNC("ModuleInfo::GetDataType", tracy::Color::Aquamarine2)
+    return allocator.New<ASTDataType>();
+}
+ASTIfStatement* ModuleInfo::GetIfStatement()
+{
+    ZoneScopedNC("ModuleInfo::GetIfStatement", tracy::Color::Aquamarine3)
+    return allocator.New<ASTIfStatement>();
+}
+ASTReturnStatement* ModuleInfo::GetReturnStatement()
+{
+    ZoneScopedNC("ModuleInfo::GetReturnStatement", tracy::Color::Aquamarine3)
+    return allocator.New<ASTReturnStatement>();
+}
+ASTFunctionDecl* ModuleInfo::GetFunctionDecl()
+{
+    ZoneScopedNC("ModuleInfo::GetFunctionDecl", tracy::Color::Aquamarine4)
+    return allocator.New<ASTFunctionDecl>();
+}
+ASTFunctionParameter* ModuleInfo::GetFunctionParameter()
+{
+    ZoneScopedNC("ModuleInfo::GetFunctionParameter", tracy::Color::Aquamarine4)
+    return allocator.New<ASTFunctionParameter>();
+}
+ASTFunctionCall* ModuleInfo::GetFunctionCall()
+{
+    ZoneScopedNC("ModuleInfo::GetFunctionCall", tracy::Color::Aquamarine4)
+    return allocator.New<ASTFunctionCall>();
+}
+ASTFunctionArgument* ModuleInfo::GetFunctionArgument()
+{
+    ZoneScopedNC("ModuleInfo::GetFunctionArgument", tracy::Color::Aquamarine4)
+    return allocator.New<ASTFunctionArgument>();
 }
 
-void Parser::Process(ModuleParser& parser)
+Parser::Parser()
 {
-    ZoneScoped;
-
-    // Module have no tokens to parse / Module has already been parsed
-    if (parser.GetTokens().size() == 0 || parser.GetStack().size() > 0)
-        return;
-
-    printf("Syntax Analyzer Started\n");
-
-    if (!CheckSyntax(parser))
-    {
-        printf("Syntax Analyzer Failed\n");
-        return;
-    }
-    else
-    {
-        printf("Syntax Analyzer Done\n\n");
-    }
-
-
-    printf("Parser Started\n");
-    BuildAST(parser);
-    printf("Parser Done\n");
+    // Setup Primitive Types
+    _typeNameHashToNaiType["auto"_djb2] = NaiType::INVALID;
+    _typeNameHashToNaiType["void"_djb2] = NaiType::NAI_VOID;
+    _typeNameHashToNaiType["bool"_djb2] = NaiType::U8;
+    _typeNameHashToNaiType["i8"_djb2] = NaiType::I8;
+    _typeNameHashToNaiType["u8"_djb2] = NaiType::U8;
+    _typeNameHashToNaiType["i16"_djb2] = NaiType::I16;
+    _typeNameHashToNaiType["u16"_djb2] = NaiType::U16;
+    _typeNameHashToNaiType["i32"_djb2] = NaiType::I32;
+    _typeNameHashToNaiType["u32"_djb2] = NaiType::U32;
+    _typeNameHashToNaiType["i64"_djb2] = NaiType::I64;
+    _typeNameHashToNaiType["u64"_djb2] = NaiType::U64;
+    _typeNameHashToNaiType["f32"_djb2] = NaiType::F32;
+    _typeNameHashToNaiType["f64"_djb2] = NaiType::F64;
 }
 
-bool Parser::CheckSyntax(ModuleParser& parser)
+bool Parser::Run(ModuleInfo& moduleInfo)
 {
-    ZoneScoped;
+    ZoneScopedNC("Parser::Run", tracy::Color::Blue)
 
-    // Get Tokens & Setup Stack
-    const std::vector<Token>& tokens = parser.GetTokens();
-    size_t tokensNum = tokens.size();
+    // Ensure that our allocator is reset
+    allocator.Reset();
 
-    std::stack<TokenType>& stack = parser.GetStack();
-    stack.push(TokenType::NTS_START);
-
-    const size_t& index = parser.GetIndex();
-    while (size_t stackSize = stack.size() > 0)
+    // Ensure ModuleInfo is valid for use
+    moduleInfo.ResetIndex();
+    
+    const size_t& tokenIndex = moduleInfo.GetTokenIndex();
+    const size_t& tokenCount = moduleInfo.GetTokenCount();
+    
+    while (tokenIndex < tokenCount)
     {
-        if (index == tokensNum)
-        {
-            if (stackSize == 1 && stack.top() == TokenType::NTS_START)
-                break;
+        Token* topToken = nullptr;
+        moduleInfo.GetToken(&topToken); // We can gaurantee a token exists here due to the (while) statement's condition
 
-            return false;
+        if (topToken->subType == TokenSubType::KEYWORD_FUNCTION)
+        {
+            // Eat KEYWORD_FUNCTION
+            moduleInfo.EatToken();
+
+            if (!ParseFunction(moduleInfo))
+                return false;
         }
-
-        const Token* token = parser.GetToken();
-        const Token* nextToken = parser.GetToken(1);
-
-        TokenType front = stack.top();
-
-        // Symbols Match
-        if (token->type == front)
+        else if (topToken->subType == TokenSubType::KEYWORD_STRUCT)
         {
-            parser.IncrementIndex();
-            stack.pop();
+
+        }
+        else if (topToken->subType == TokenSubType::KEYWORD_ENUM)
+        {
+
         }
         else
         {
-            switch (front)
+            if (topToken->type == TokenType::IDENTIFIER)
             {
-                case TokenType::NTS_START:
+                if (topToken->subType == TokenSubType::FUNCTION_CALL)
                 {
-                    switch (_rules[front][token->type])
-                    {
-                        // KEYWORD
-                        case 1:
-                        {
-                            // Keyword
-                            stack.pop();
-                            stack.push(TokenType::NTS_START);
-
-                            if (token->subType == TokenSubType::KEYWORD_FUNCTION)
-                            {
-                                stack.push(TokenType::RBRACE);
-                                stack.push(TokenType::NTS_BODY);
-                                stack.push(TokenType::LBRACE);
-                                stack.push(TokenType::NTS_RETURN_TYPE);
-                                stack.push(TokenType::NTS_ARGUMENT_LIST);
-                                stack.push(TokenType::IDENTIFIER);
-                            }
-                            else if (token->subType == TokenSubType::KEYWORD_STRUCT)
-                            {
-                                stack.push(TokenType::END_OF_LINE);
-                                stack.push(TokenType::RBRACE);
-                                stack.push(TokenType::NTS_STRUCT_MEMBER);
-                                stack.push(TokenType::LBRACE);
-
-                                stack.push(TokenType::STRUCT);
-                            }
-                            else if (token->subType == TokenSubType::KEYWORD_ENUM)
-                            {
-                                stack.push(TokenType::END_OF_LINE);
-                                stack.push(TokenType::RBRACE);
-                                stack.push(TokenType::NTS_ENUM_MEMBER);
-                                stack.push(TokenType::LBRACE);
-                                stack.push(TokenType::ENUM);
-                            }
-                            else
-                            {
-                                return false;
-                            }
-
-                            stack.push(TokenType::KEYWORD);
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-
-                    break;
-                }
-                case TokenType::NTS_BODY:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // IDENTIFIER
-                        case 1:
-                        {
-                            // Identifier
-                            stack.pop();
-                            stack.push(TokenType::NTS_BODY);
-                            stack.push(TokenType::END_OF_LINE);
-
-                            if (token->subType == TokenSubType::FUNCTION_CALL)
-                            {
-                                stack.push(TokenType::NTS_PARAMETER_LIST);
-                            }
-                            else
-                            {
-                                if (nextToken->type == TokenType::OP_ASSIGN)
-                                {
-                                    stack.push(TokenType::NTS_EXPRESSION);
-                                    stack.push(TokenType::OP_ASSIGN);
-                                }
-                                else
-                                {
-                                    stack.push(TokenType::NTS_DECLARATION);
-                                }
-                            }
-
-                            stack.push(TokenType::IDENTIFIER);
-                            break;
-                        }
-                        // KEYWORD
-                        case 2:
-                        {
-                            // Keyword
-                            stack.pop();
-                            stack.push(TokenType::NTS_BODY);
-
-                            if (token->subType == TokenSubType::KEYWORD_STRUCT || token->subType == TokenSubType::KEYWORD_ENUM)
-                                return false;
-
-                            if (token->subType == TokenSubType::KEYWORD_WHILE)
-                            {
-                                stack.push(TokenType::RBRACE);
-                                stack.push(TokenType::NTS_BODY);
-                                stack.push(TokenType::LBRACE);
-                                stack.push(TokenType::RPAREN);
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(TokenType::LPAREN);
-                            }
-                            else if (token->subType == TokenSubType::KEYWORD_IF)
-                            {
-                                stack.push(TokenType::NTS_IF_TERMINATOR);
-                                stack.push(TokenType::RBRACE);
-                                stack.push(TokenType::NTS_BODY);
-                                stack.push(TokenType::LBRACE);
-                                stack.push(TokenType::RPAREN);
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(TokenType::LPAREN);
-                            }
-                            else if (token->subType == TokenSubType::KEYWORD_FOR)
-                            {
-                                stack.push(TokenType::RBRACE);
-                                stack.push(TokenType::NTS_BODY);
-                                stack.push(TokenType::LBRACE);
-                                stack.push(TokenType::RPAREN);
-                                stack.push(TokenType::NTS_EXPRESSION);
-                                stack.push(TokenType::END_OF_LINE);
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(TokenType::END_OF_LINE);
-                                stack.push(TokenType::NTS_DECLARATION);
-                                stack.push(TokenType::IDENTIFIER);
-                                stack.push(TokenType::LPAREN);
-                            }
-                            else if (token->subType == TokenSubType::KEYWORD_BREAK || token->subType == TokenSubType::KEYWORD_CONTINUE)
-                            {
-                                stack.push(TokenType::END_OF_LINE);
-                            }
-                            else if (token->subType == TokenSubType::KEYWORD_RETURN)
-                            {
-                                if (nextToken->type != TokenType::END_OF_LINE)
-                                {
-                                    stack.push(TokenType::END_OF_LINE);
-                                    stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                }
-                            }
-
-                            stack.push(TokenType::KEYWORD);
-                            break;
-                        }
-                        // RBRACE
-                        case 3:
-                        {
-                            stack.pop();
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-
-                    break;
-                }
-                case TokenType::NTS_DECLARATION:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // OP_DECLARATION
-                        case 1:
-                        {
-                            if (token->subType == TokenSubType::NONE || token->subType == TokenSubType::CONST_DECLARATION)
-                            {
-                                stack.pop();
-
-                                if (token->subType == TokenSubType::CONST_DECLARATION)
-                                {
-                                    stack.push(TokenType::NTS_EXPRESSION);
-                                    stack.push(TokenType::OP_ASSIGN);
-                                }
-                                else
-                                {
-                                    stack.push(TokenType::NTS_DECLARATION_TERMINATOR);
-                                }
-
-                                stack.push(TokenType::DATATYPE);
-                                stack.push(TokenType::DECLARATION);
-                                break;
-                            }
-                            else if (token->subType == TokenSubType::DECLARATION_ASSIGN || token->subType == TokenSubType::CONST_DECLARATION_ASSIGN)
-                            {
-                                stack.pop();
-                                stack.push(TokenType::NTS_EXPRESSION);
-                                stack.push(TokenType::DECLARATION);
-                                break;
-                            }
-
-                            return false;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_DECLARATION_TERMINATOR:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // OP_ASSIGN
-                        case 1:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_EXPRESSION);
-                            stack.push(TokenType::OP_ASSIGN);
-                            break;
-                        }
-                        // END_OF_LINE
-                        case 2:
-                        {
-                            // The END_OF_LINE symbol should already be on the stack if this is reached
-                            stack.pop();
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_VALUE:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // IDENTIFIER
-                        case 1:
-                        {
-                            stack.pop();
-
-                            if (token->subType == TokenSubType::FUNCTION_CALL)
-                            {
-                                stack.push(TokenType::NTS_PARAMETER_LIST);
-                            }
-
-                            stack.push(TokenType::IDENTIFIER);
-                            break;
-                        }
-                        // LITERAL
-                        case 2:
-                        {
-                            stack.pop();
-
-                            // We need to check if this is an expression
-                            if (nextToken->IsExpressionOperator())
-                            {
-                                // OP_ACCESS && OP_DECLARATION Fall in the value range checked above from .type, and they're not valid operators
-                                // when forming an expression.
-                                stack.push(TokenType::NTS_EXPRESSION);
-                                stack.push(nextToken->type);
-                            }
-
-                            stack.push(TokenType::LITERAL);
-                            break;
-                        }
-                        // KEYWORD
-                        case 3:
-                        {
-                            stack.pop();
-
-                            if (token->subType != TokenSubType::KEYWORD_TRUE && token->subType != TokenSubType::KEYWORD_FALSE)
-                                return false;
-
-                            // We need to check if this is an expression
-                            if (nextToken->IsExpressionOperator())
-                            {
-                                // OP_ACCESS && OP_DECLARATION Fall in the value range checked above from .type, and they're not valid operators
-                                // when forming an expression.
-                                stack.push(TokenType::NTS_EXPRESSION);
-                                stack.push(nextToken->type);
-                            }
-
-                            stack.push(TokenType::KEYWORD);
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_EXPRESSION:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // IDENTIFIER
-                        case 1:
-                        {
-                            stack.pop();
-
-                            if (token->subType == TokenSubType::FUNCTION_CALL)
-                            {
-                                stack.push(TokenType::NTS_PARAMETER_LIST);
-                            }
-
-                            // We need to check if this is an assign or expression
-                            if (nextToken->type == TokenType::OP_ASSIGN || nextToken->IsExpressionOperator())
-                            {
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(nextToken->type);
-                            }
-
-                            stack.push(TokenType::IDENTIFIER);
-                            break;
-                        }
-                        // LITERAL
-                        case 2:
-                        {
-                            stack.pop();
-
-                            // We need to check if this is an assign or expression
-                            if (nextToken->type == TokenType::OP_ASSIGN || nextToken->IsExpressionOperator())
-                            {
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(nextToken->type);
-                            }
-
-                            stack.push(TokenType::LITERAL);
-                            break;
-                        }
-                        // KEYWORD
-                        case 3:
-                        {
-                            stack.pop();
-
-                            if (token->subType != TokenSubType::KEYWORD_TRUE && token->subType != TokenSubType::KEYWORD_FALSE)
-                                return false;
-
-                            // We need to check if this is an assign or expression
-                            if (nextToken->type == TokenType::OP_ASSIGN || nextToken->IsExpressionOperator())
-                            {
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(nextToken->type);
-                            }
-
-                            stack.push(TokenType::KEYWORD);
-                            break;
-                        }
-                        // OP_NOT
-                        case 4:
-                        {
-                            stack.pop();
-
-                            stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                            stack.push(TokenType::OP_NOT);
-                            break;
-                        }
-                        // LPAREN
-                        case 5:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_EXPRESSION_SEQUENCE);
-                            stack.push(TokenType::RPAREN);
-                            stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                            stack.push(TokenType::LPAREN);
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_EXPRESSION_RECURSIVE:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // IDENTIFIER
-                        case 1:
-                        {
-                            stack.pop();
-
-                            if (token->subType == TokenSubType::FUNCTION_CALL)
-                            {
-                                stack.push(TokenType::NTS_PARAMETER_LIST);
-                            }
-
-                            // We need to check if this is an expression
-                            if (nextToken->IsExpressionOperator())
-                            {
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(nextToken->type);
-                            }
-
-                            stack.push(TokenType::IDENTIFIER);
-                            break;
-                        }
-                        // LITERAL
-                        case 2:
-                        {
-                            stack.pop();
-
-                            // We need to check if this is an expression
-                            if (nextToken->IsExpressionOperator())
-                            {
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(nextToken->type);
-                            }
-
-                            stack.push(TokenType::LITERAL);
-                            break;
-                        }
-                        // KEYWORD
-                        case 3:
-                        {
-                            stack.pop();
-
-                            if (token->subType != TokenSubType::KEYWORD_TRUE && token->subType != TokenSubType::KEYWORD_FALSE)
-                                return false;
-
-                            // We need to check if this is an expression
-                            if (nextToken->IsExpressionOperator())
-                            {
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(nextToken->type);
-                            }
-
-                            stack.push(TokenType::KEYWORD);
-                            break;
-                        }
-                        // OP_NOT
-                        case 4:
-                        {
-                            stack.pop();
-
-                            stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                            stack.push(TokenType::OP_NOT);
-                            break;
-                        }
-                        // LPAREN
-                        case 5:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_EXPRESSION_SEQUENCE);
-                            stack.push(TokenType::RPAREN);
-                            stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                            stack.push(TokenType::LPAREN);
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_EXPRESSION_SEQUENCE:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // Expressional Operators
-                        case 1:
-                        {
-                            stack.pop();
-
-                            stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                            stack.push(token->type);
-                            break;
-                        }
-                        // LPAREN / RPAREN / END OF LINE
-                        case 2:
-                        {
-                            stack.pop();
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_PARAMETER_LIST:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // LPAREN
-                        case 1:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::RPAREN);
-
-                            // We need to check if this is an expression
-                            if (nextToken->type != TokenType::RPAREN)
-                            {
-                                stack.push(TokenType::NTS_PARAMETER_TERMINATOR);
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                            }
-                            stack.push(TokenType::LPAREN);
-
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_PARAMETER_TERMINATOR:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // OPERATOR
-                        case 1:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_PARAMETER_TERMINATOR);
-                            stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                            stack.push(token->type);
-                            break;
-                        }
-                        // PARAM_SEPERATOR
-                        case 2:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_PARAMETER_TERMINATOR);
-                            stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                            stack.push(TokenType::PARAM_SEPERATOR);
-                            break;
-                        }
-                        // RPAREN
-                        case 3:
-                        {
-                            stack.pop();
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_ARGUMENT_LIST:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // LPAREN
-                        case 1:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::RPAREN);
-
-                            // We need to check if there are arguments to be parsed
-                            if (nextToken->type != TokenType::RPAREN)
-                            {
-                                stack.push(TokenType::NTS_ARGUMENT_DECLARATION);
-                                stack.push(TokenType::IDENTIFIER);
-                            }
-
-                            stack.push(TokenType::LPAREN);
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_ARGUMENT_DECLARATION:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // OP_DECLARATION
-                        case 1:
-                        {
-                            if (token->subType == TokenSubType::NONE || token->subType == TokenSubType::CONST_DECLARATION)
-                            {
-                                stack.pop();
-
-                                if (token->subType == TokenSubType::CONST_DECLARATION)
-                                {
-                                    stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                    stack.push(TokenType::OP_ASSIGN);
-                                }
-                                else
-                                {
-                                    stack.push(TokenType::NTS_ARGUMENT_DECLARATION_SEQUENCE);
-                                }
-
-                                stack.push(TokenType::DATATYPE);
-                                stack.push(TokenType::DECLARATION);
-                                break;
-                            }
-                            else if (token->subType == TokenSubType::DECLARATION_ASSIGN || token->subType == TokenSubType::CONST_DECLARATION_ASSIGN)
-                            {
-                                stack.pop();
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(TokenType::DECLARATION);
-                                break;
-                            }
-
-                            return false;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_ARGUMENT_DECLARATION_SEQUENCE:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // OP_ASSIGN
-                        case 1:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_ARGUMENT_TERMINATOR);
-                            stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                            stack.push(TokenType::OP_ASSIGN);
-                            break;
-                        }
-                        // PARAM_SEPERATOR
-                        case 2:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_ARGUMENT_DECLARATION);
-                            stack.push(TokenType::IDENTIFIER);
-
-                            stack.push(TokenType::PARAM_SEPERATOR);
-
-                            break;
-                        }
-                        // RPAREN
-                        case 3:
-                        {
-                            stack.pop();
-                            break;
-                        }
-
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_ARGUMENT_TERMINATOR:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // PARAM_SEPERATOR
-                        case 1:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_ARGUMENT_DECLARATION);
-                            stack.push(TokenType::IDENTIFIER);
-
-                            stack.push(TokenType::PARAM_SEPERATOR);
-
-                            break;
-                        }
-                        // RPAREN
-                        case 2:
-                        {
-                            stack.pop();
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_STRUCT_MEMBER:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // IDENTIFIER
-                        case 1:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_STRUCT_MEMBER);
-
-                            // We expect an identifier
-                            if (token->subType != TokenSubType::NONE)
-                                return false;
-
-                            // We expect the next token to be a declarator
-                            if (nextToken->type != TokenType::DECLARATION)
-                                return false;
-
-                            stack.push(TokenType::END_OF_LINE);
-                            stack.push(TokenType::NTS_DECLARATION);
-                            stack.push(TokenType::IDENTIFIER);
-                            break;
-                        }
-                        // KEYWORD
-                        case 2:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_STRUCT_MEMBER);
-
-                            if (token->subType == TokenSubType::KEYWORD_FUNCTION)
-                            {
-                                stack.push(TokenType::RBRACE);
-                                stack.push(TokenType::NTS_BODY);
-                                stack.push(TokenType::LBRACE);
-                                stack.push(TokenType::NTS_RETURN_TYPE);
-                                stack.push(TokenType::NTS_ARGUMENT_LIST);
-                                stack.push(TokenType::IDENTIFIER);
-                            }
-
-                            stack.push(TokenType::KEYWORD);
-                            break;
-                        }
-                        // RBRACE
-                        case 3:
-                        {
-                            stack.pop();
-                            break;
-                        }
-
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_ENUM_MEMBER:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // IDENTIFIER
-                        case 1:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_ENUM_MEMBER);
-
-                            // We expect an identifier
-                            if (token->subType != TokenSubType::NONE)
-                                return false;
-
-                            // We expect the next token to be a declarator
-                            if (nextToken->type != TokenType::OP_ASSIGN)
-                                return false;
-
-                            stack.push(TokenType::NTS_ENUM_TERMINATOR);
-                            stack.push(TokenType::NTS_EXPRESSION);
-                            stack.push(TokenType::OP_ASSIGN);
-                            stack.push(TokenType::IDENTIFIER);
-                            break;
-                        }
-                        // RBRACE
-                        case 2:
-                        {
-                            stack.pop();
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_ENUM_TERMINATOR:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // PARAM_SEPERATOR
-                        case 1:
-                        {
-                            stack.pop();
-                            stack.push(TokenType::NTS_ENUM_MEMBER);
-
-                            stack.push(TokenType::PARAM_SEPERATOR);
-                            break;
-                        }
-                        // RPAREN
-                        case 2:
-                        {
-                            stack.pop();
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_IF_TERMINATOR:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // KEYWORD
-                        case 1:
-                        {
-                            stack.pop();
-
-                            if (token->subType != TokenSubType::KEYWORD_ELSEIF && token->subType != TokenSubType::KEYWORD_ELSE)
-                                return false;
-
-                            if (token->subType == TokenSubType::KEYWORD_ELSEIF)
-                            {
-                                stack.push(TokenType::NTS_IF_TERMINATOR);
-
-                                stack.push(TokenType::RBRACE);
-                                stack.push(TokenType::NTS_BODY);
-                                stack.push(TokenType::LBRACE);
-
-                                stack.push(TokenType::RPAREN);
-                                stack.push(TokenType::NTS_EXPRESSION_RECURSIVE);
-                                stack.push(TokenType::LPAREN);
-                            }
-                            else
-                            {
-                                stack.push(TokenType::RBRACE);
-                                stack.push(TokenType::NTS_BODY);
-                                stack.push(TokenType::LBRACE);
-                            }
-
-                            stack.push(TokenType::KEYWORD);
-                            break;
-                        }
-                        // NTS_BODY / RBRACE
-                        case 2:
-                        {
-                            stack.pop();
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-                case TokenType::NTS_RETURN_TYPE:
-                {
-                    switch (_rules[front][token->type])
-                    {
-                        // OP_SUBTRACT
-                        case 1:
-                        {
-                            stack.pop();
-
-                            if (token->subType != TokenSubType::OP_RETURN_TYPE)
-                                return false;
-
-                            stack.push(TokenType::DATATYPE);
-                            stack.push(TokenType::OP_SUBTRACT);
-                            break;
-                        }
-                        // LBRACE
-                        case 2:
-                        {
-                            stack.pop();
-                            break;
-                        }
-                        // We defaulted, this means the syntax is bad
-                        default:
-                            return false;
-                    }
-                    break;
-                }
-
-                // We defaulted, this means the syntax is bad
-                default:
-                    return false;
-            }      
-        }
-    }
-
-    parser.ResetIndex();
-    return true;
-}
-
-void Parser::BuildAST(ModuleParser& parser)
-{
-    ZoneScoped;
-
-    size_t tokensNum = parser.GetTokens().size();
-
-    size_t& index = parser.GetIndex();
-    while (index < tokensNum)
-    {
-        const Token* token = parser.GetTokenIncrement();
-        if (token->type == TokenType::KEYWORD)
-        {
-            if (token->subType == TokenSubType::KEYWORD_FUNCTION)
-            {
-                ASTFunctionDecl* functionNode = ParseFunction(parser);
-                if (!functionNode)
-                    return;
-
-                parser.moduleFunctionNodes.push_back(functionNode);
-            }
-            else if (token->subType == TokenSubType::KEYWORD_STRUCT)
-            {
-                ASTStruct* structNode = ParseStruct(parser);
-                if (!structNode)
-                    return;
-
-                parser.moduleStructNodes.push_back(structNode);
-            }
-            else if (token->subType == TokenSubType::KEYWORD_ENUM)
-            {
-                ASTEnum* enumNode = ParseEnum(parser);
-                if (!enumNode)
-                    return;
-
-                parser.modueEnumNodes.push_back(enumNode);
-            }
-        }
-    }
-
-    VisitAST(parser.modueEnumNodes);
-    VisitAST(parser.moduleStructNodes);
-    VisitAST(parser.moduleFunctionNodes);
-
-    parser.ResetIndex();
-}
-
-ASTFunctionDecl* Parser::ParseFunction(ModuleParser& parser)
-{
-    const Token* fnIdentifierToken = parser.GetTokenIncrement();
-    ASTFunctionDecl* fnNode = new ASTFunctionDecl(fnIdentifierToken);
-
-    ASTSequence* currentSequence = fnNode->top;
-
-    // Handle Function Header
-    parser.IncrementIndex(); // Skip LParen Index
-    {
-        while (const Token* startToken = parser.GetToken())
-        {
-            if (startToken->type == TokenType::RPAREN)
-                break;
-
-            ASTFunctionParam* fnParam = new ASTFunctionParam(startToken);
-            fnNode->parameters.push_back(fnParam);
-
-            // Skip Identifier & Declaration Token
-            parser.IncrementIndex(2);
-
-            const Token* dataTypeToken = parser.GetTokenIncrement();
-            fnParam->dataType = new ASTDataType(dataTypeToken);
-
-            const Token* endToken = parser.GetToken();
-            if (endToken->type == TokenType::OP_ASSIGN)
-            {
-                // Skip OP_ASSIGN Index
-                parser.IncrementIndex();
-                fnParam->defaultValue = ParseExpression(parser);
-            }
-            else if (endToken->type == TokenType::PARAM_SEPERATOR)
-            {
-                // SKIP PARAM_SEPERATOR Index
-                parser.IncrementIndex();
-            }
-        }
-    }
-    parser.IncrementIndex(); // Skip RParen Index
-
-    // Check for return type
-    const Token* returnOperatorToken = parser.GetToken();
-    if (returnOperatorToken->type == TokenType::OP_SUBTRACT)
-    {
-        // Skip Return Type Operator Index
-        parser.IncrementIndex();
-
-        // Skip Return Type Index
-        const Token* returnTypeToken = parser.GetTokenIncrement();
-        fnNode->returnType = new ASTDataType(returnTypeToken);
-    }
-    else
-    {
-        // Default return type to void (We might be able to infer the type from a "return" if its seen later)
-        fnNode->returnType = new ASTDataType(defaultReturnTypeToken);
-    }
-
-    // Handle Function Body
-    parser.IncrementIndex(); // Skip LBRACE Index
-    {
-        while (true)
-        {
-            const Token* token = parser.GetToken();
-            if (token->type == TokenType::RBRACE)
-                break;
-
-            if (token->type == TokenType::IDENTIFIER)
-            {
-                if (token->subType == TokenSubType::FUNCTION_CALL)
-                {
-                    currentSequence->left = ParseFunctionCall(parser);
+                    moduleInfo.ReportError("Global Function calls are not allowed.", nullptr);
                 }
                 else
                 {
-                    ASTVariable* variable = ParseVariable(parser);
-                    if (!variable)
-                        return nullptr;
-
-                    // If DataType is a valid pointer, we know this was a declaration, this means we need to check if
-                    // A variable in this function by that same name exists, if so, we have a conflict 
-                    // (Scopes can change this but we currently don't have any support for scope)
-
-                    ASTVariable* varPtr = nullptr;
-                    for (ASTVariable* var : fnNode->variables)
-                    {
-                        if (variable->GetNameHash() == var->GetNameHash())
-                        {
-                            varPtr = var;
-                            break;
-                        }
-                    }
-
-                    if (variable->dataType)
-                    {
-                        if (varPtr)
-                        {
-                            ReportError(1, "Redeclaration of variable (Name: %.*s, Line: %i, Col: %i) at (Line: %u, Col: %u)\n", varPtr->GetNameSize(), varPtr->GetName().data(), varPtr->token->lineNum, varPtr->token->colNum, variable->token->lineNum, variable->token->colNum);
-                            return nullptr;
-                        }
-
-                        fnNode->variables.push_back(variable);
-                    }
-                    else
-                    {
-                        if (!varPtr)
-                        {
-                            ReportError(2, "Use of undeclared variable (Name: %.*s, At Line: %i, At Col: %i)\n", variable->GetNameSize(), variable->GetName().data(), variable->token->lineNum, variable->token->colNum);
-                            return nullptr;
-                        }
-
-                        variable->parent = varPtr;
-                        variable->dataType = variable->parent->dataType;
-                    }
-
-                    currentSequence->left = variable;
-                }
-            }
-            else if (token->type == TokenType::KEYWORD)
-            {
-                if (token->subType == TokenSubType::KEYWORD_WHILE)
-                {
-                    currentSequence->left = ParseKeywordWhile(parser);
-                }
-                else if (token->subType == TokenSubType::KEYWORD_IF)
-                {
-                    currentSequence->left = ParseKeywordIf(parser);
-                }
-                else if (token->subType == TokenSubType::KEYWORD_FOR)
-                {
-                    currentSequence->left = ParseKeywordFor(parser);
-                }
-                else if (token->subType == TokenSubType::KEYWORD_RETURN)
-                {
-                    currentSequence->left = ParseKeywordReturn(parser);
-                }
-            }
-
-            currentSequence->right = new ASTSequence();
-            currentSequence = currentSequence->right;
-        }
-    }
-    parser.IncrementIndex(); // Skip RBrace Index
-
-    return fnNode;
-}
-ASTFunctionCall* Parser::ParseFunctionCall(ModuleParser& parser)
-{
-    const Token* identifierToken = parser.GetTokenIncrement();
-    ASTFunctionCall* functionCall = new ASTFunctionCall(identifierToken);
-
-    // Handle Function Call
-    parser.IncrementIndex(); // Skip LParen Index
-    {    
-        while (true)
-        {
-            // This will skip RParen Index
-            const Token* token = parser.GetToken();
-            if (token->type == TokenType::RPAREN)
-            {
-                break;
-            }
-            else if (token->type == TokenType::PARAM_SEPERATOR)
-            {
-                // Skip Param Seperator
-                parser.IncrementIndex();
-                continue;
-            }
-
-            ASTNode* node = nullptr;
-            if (token->type == TokenType::IDENTIFIER && token->subType == TokenSubType::FUNCTION_CALL)
-            {
-                ASTFunctionCall* fn = ParseFunctionCall(parser);
-
-                const Token* nextToken = parser.GetToken();
-                if (nextToken->IsExpressionOperator())
-                {
-                    // Skip Operator Index
-                    parser.IncrementIndex();
-
-                    ASTOperator* op = new ASTOperator(nextToken);
-                    op->left = fn;
-                    op->right = ParseExpression(parser);
-
-                    node = op;
-                }
-                else
-                {
-                    node = fn;
+                    moduleInfo.ReportError("Global Variables are not allowed.", nullptr);
                 }
             }
             else
             {
-                node = ParseExpression(parser);
+                moduleInfo.ReportError("Expected to find a Struct, Enum or Function declaration.", nullptr);
             }
 
-            functionCall->parameters.push_back(node);
+            return false;
         }
     }
 
-    parser.IncrementIndex(2); // Skip RParen & END_OF_LINE Index
-    return functionCall;
+    return RunSemanticCheck(moduleInfo);
 }
-
-ASTStruct* Parser::ParseStruct(ModuleParser& parser)
+bool Parser::RunSemanticCheck(ModuleInfo& moduleInfo)
 {
-    const Token* structToken = parser.GetTokenIncrement();
-    ASTStruct* structNode = new ASTStruct(structToken);
+    std::vector<ASTFunctionDecl*>& fnNodes = moduleInfo.GetFunctionNodes();
 
-    parser.IncrementIndex(); // Skip LBRACE Index
+    for (ASTFunctionDecl* fnDecl : fnNodes)
     {
-        while (const Token* startToken = parser.GetToken())
+        // Check Parameter List
         {
-            if (startToken->type == TokenType::RBRACE)
+            if (!CheckFunctionParameters(moduleInfo, fnDecl))
                 break;
+        }
 
-            if (startToken->type == TokenType::IDENTIFIER)
+        // Check Body
+        {
+            if (!CheckFunctionBody(moduleInfo, fnDecl))
+                break;
+        }
+    }
+
+    return false;
+}
+
+bool Parser::ParseFunction(ModuleInfo& moduleInfo)
+{
+    ZoneScopedNC("Parser::ParseFunction", tracy::Color::Blue1)
+
+    Token* identifier = nullptr;
+    if (!moduleInfo.EatToken(&identifier) || (identifier->type != TokenType::IDENTIFIER && identifier->subType != TokenSubType::FUNCTION_DECLARATION))
+    {
+        moduleInfo.ReportError("Expected to find a function name.", nullptr);
+        return false;
+    }
+
+    ASTFunctionDecl* fnDecl = moduleInfo.GetFunctionDecl();
+    fnDecl->UpdateToken(identifier);
+    fnDecl->returnType = moduleInfo.GetDataType();
+    fnDecl->body = moduleInfo.GetSequence();
+
+    if (!ParseFunctionParameterList(moduleInfo, fnDecl))
+        return false;
+
+    if (!ParseFunctionReturnType(moduleInfo, fnDecl))
+        return false;
+    
+    if (!ParseFunctionBody(moduleInfo, fnDecl))
+        return false;
+
+    moduleInfo.AddFunctionNode(fnDecl);
+    return true;
+}
+bool Parser::ParseFunctionParameterList(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
+{
+    ZoneScopedNC("Parser::ParseFunctionParameterList", tracy::Color::Blue2)
+
+    Token* leftParen = nullptr;
+    if (!moduleInfo.EatToken(&leftParen) || leftParen->type != TokenType::LPAREN)
+    {
+        moduleInfo.ReportError("Expected to find opening function parentheses.", nullptr);
+        return false;
+    }
+
+    Token* token = nullptr;
+    if (!moduleInfo.GetToken(&token))
+    {
+        moduleInfo.ReportError("Expected to find 'closing parentheses'.", nullptr);
+        return false;
+    }
+
+    if (token->type != TokenType::RPAREN)
+    {
+        // Parse Parameter List
+        while (true)
+        {
+            Token* identifierToken = nullptr;
+            if (!moduleInfo.EatToken(&identifierToken) || identifierToken->type != TokenType::IDENTIFIER)
             {
-                ASTVariable* variable = ParseVariable(parser);
-                structNode->variables.push_back(variable);
+                moduleInfo.ReportError("Expected to find 'function parameter'.", nullptr);
+                return false;
             }
-            else if (startToken->type == TokenType::KEYWORD && startToken->subType == TokenSubType::KEYWORD_FUNCTION)
-            {
-                // Skip KEYWORD_FUNCTION Index
-                parser.IncrementIndex();
 
-                ASTFunctionDecl* fnDecl = ParseFunction(parser);
-                structNode->functions.push_back(fnDecl);
+            if (identifierToken->type != TokenType::IDENTIFIER)
+            {
+                moduleInfo.ReportError("Expected to find identifier for parameter.", nullptr);
+                return false;
+            }
+            else if (identifierToken->subType == TokenSubType::FUNCTION_CALL)
+            {
+                moduleInfo.ReportError("Expected to find identifier for parameter (Did you accidentally add parentheses?).", nullptr);
+                return false;
+            }
+
+            Token* declarationToken = nullptr;
+            if (!moduleInfo.EatToken(&declarationToken) || declarationToken->type != TokenType::DECLARATION)
+            {
+                moduleInfo.ReportError("Expected to find declaration operator for parameter(%.*s).", nullptr, identifierToken->valueSize, identifierToken->value);
+                return false;
+            }
+
+            ASTFunctionParameter* param = moduleInfo.GetFunctionParameter();
+            param->UpdateToken(identifierToken);
+            param->dataType = moduleInfo.GetDataType();
+
+            fnDecl->AddParameter(param);
+
+            if (declarationToken->subType == TokenSubType::NONE || declarationToken->subType == TokenSubType::CONST_DECLARATION)
+            {
+                Token* dataTypeToken = nullptr;
+                if (!moduleInfo.EatToken(&dataTypeToken) || dataTypeToken->type != TokenType::DATATYPE)
+                {
+                    moduleInfo.ReportError("Expected to find data type for parameter(%.*s).", nullptr, identifierToken->valueSize, identifierToken->value);
+                    return false;
+                }
+
+                NaiType type = GetTypeFromChar(dataTypeToken->value, dataTypeToken->valueSize);
+                param->dataType->UpdateToken(dataTypeToken);
+                param->dataType->SetType(type);
+
+                Token* assignToken = nullptr;
+                if (!moduleInfo.GetToken(&assignToken) || (assignToken->type != TokenType::OP_ASSIGN && assignToken->type != TokenType::PARAM_SEPERATOR && assignToken->type != TokenType::RPAREN))
+                {
+                    moduleInfo.ReportError("Expected to find 'assignment operator', 'param seperator' or 'closing parentheses' for parameter(%.*s).", nullptr, identifierToken->valueSize, identifierToken->value);
+                    return false;
+                }
+
+                if (assignToken->type == TokenType::OP_ASSIGN)
+                {
+                    // Eat OP_ASSIGN
+                    moduleInfo.EatToken();
+
+                    param->expression = moduleInfo.GetExpression();;
+                    if (!ParseExpression(moduleInfo, fnDecl, param->expression))
+                        return false;
+                }
+            }
+            else if (declarationToken->subType == TokenSubType::DECLARATION_ASSIGN || declarationToken->subType == TokenSubType::CONST_DECLARATION_ASSIGN)
+            {
+                moduleInfo.ReportError("Declaration Assignment is not allowed for parameters(Name: %.*s).", nullptr, identifierToken->valueSize, identifierToken->value);
+                return false;
+            }
+
+            Token* paramTerminator = nullptr;
+            if (!moduleInfo.GetToken(&paramTerminator) || (paramTerminator->type != TokenType::RPAREN && paramTerminator->type != TokenType::PARAM_SEPERATOR))
+            {
+                moduleInfo.ReportError("Expected to find parameter seperator OR closing parentheses for parameter(%.*s).", nullptr, identifierToken->valueSize, identifierToken->value);
+                return false;
+            }
+
+            if (paramTerminator->type == TokenType::PARAM_SEPERATOR)
+            {
+                // Eat PARAM_SEPERATOR
+                moduleInfo.EatToken();
+            }
+            else if (paramTerminator->type == TokenType::RPAREN)
+            {
+                break;
             }
         }
     }
-    parser.IncrementIndex(); // Skip RBRACE Index
 
-    return structNode;
+    // Eat RightParen
+    moduleInfo.EatToken();
+
+    return true;
 }
-ASTEnum* Parser::ParseEnum(ModuleParser& /*parser*/)
+bool Parser::ParseFunctionReturnType(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
 {
-    return nullptr;
-}
+    ZoneScopedNC("Parser::ParseFunctionParameterList", tracy::Color::Blue2)
 
-ASTVariable* Parser::ParseVariable(ModuleParser& parser)
-{
-    const Token* identifierToken = parser.GetTokenIncrement();
-    ASTVariable* variable = new ASTVariable(identifierToken);
-
-    const Token* nextToken = parser.GetTokenIncrement();
-    if (nextToken->type == TokenType::DECLARATION)
+    Token* typeToken = nullptr;
+    if (!moduleInfo.GetToken(&typeToken) || (typeToken->type != TokenType::LBRACE && typeToken->subType != TokenSubType::OP_RETURN_TYPE))
     {
-        variable->isConst = nextToken->subType == TokenSubType::CONST_DECLARATION || nextToken->subType == TokenSubType::CONST_DECLARATION_ASSIGN;
-
-        if (nextToken->subType == TokenSubType::NONE || nextToken->subType == TokenSubType::CONST_DECLARATION)
-        {
-            const Token* dataTypeToken = parser.GetTokenIncrement();
-            variable->dataType = new ASTDataType(dataTypeToken);
-
-            const Token* assignToken = parser.GetTokenIncrement();
-            if (assignToken->type == TokenType::OP_ASSIGN)
-            {
-                variable->value = ParseExpression(parser);
-            }
-        }
-        else if (nextToken->subType == TokenSubType::DECLARATION_ASSIGN || nextToken->subType == TokenSubType::CONST_DECLARATION_ASSIGN)
-        {
-            variable->dataType = new ASTDataType(inferTypeToken);
-            variable->value = ParseExpression(parser);
-        }
-    }
-    else if (nextToken->type == TokenType::OP_ASSIGN)
-    {
-        if (variable->isConst)
-        {
-            ReportError(3, "Const Variables cannot be assigned to after being declared and must be set when declared (Name: %.*s, At Line: %i, At Col: %i)\n", variable->GetNameSize(), variable->GetName().data(), variable->token->lineNum, variable->token->colNum);
-            return nullptr;
-        }
-        variable->value = ParseExpression(parser);
+        moduleInfo.ReportError("Expected to find the function body or return type.", nullptr);
+        return false;
     }
 
-    // Skip END_OF_LINE Index
-    parser.IncrementIndex();
-
-    return variable;
-}
-
-ASTNode* Parser::ParseExpression(ModuleParser& parser)
-{
-    // Parse Expression
-    const Token* token = parser.GetToken();
-    ASTNode* node = nullptr;
-
-    if (token->type == TokenType::IDENTIFIER && token->subType == TokenSubType::FUNCTION_CALL)
+    // If we see LBRACE, we need to default the function's data type to void
+    if (typeToken->type == TokenType::LBRACE)
     {
-        node = ParseFunctionCall(parser);
+        fnDecl->returnType->SetType(NaiType::NAI_VOID);
     }
     else
     {
-        node = new ASTExpression(token);
+        // Eat Return Type Operator
+        moduleInfo.EatToken();
 
-        // Skip Token Index
-        parser.IncrementIndex();
+        Token* dataTypeToken = nullptr;
+        if (!moduleInfo.EatToken(&dataTypeToken) || (dataTypeToken->type != TokenType::DATATYPE))
+        {
+            moduleInfo.ReportError("Expected to function return type.", nullptr);
+            return false;
+        }
+
+        NaiType type = GetTypeFromChar(dataTypeToken->value, dataTypeToken->valueSize);
+        fnDecl->returnType->UpdateToken(dataTypeToken);
+        fnDecl->returnType->SetType(type);
+
+        if (type == NaiType::INVALID)
+        {
+            moduleInfo.ReportError("Function has invalid return type (type: %.*s).", nullptr, dataTypeToken->valueSize, dataTypeToken->value);
+            return false;
+        }
     }
+
+    return true;
+}
+bool Parser::ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
+{
+    ZoneScopedNC("Parser::ParseFunctionBody", tracy::Color::Blue3)
+
+    Token* leftBrace = nullptr;
+    if (!moduleInfo.EatToken(&leftBrace) || leftBrace->type != TokenType::LBRACE)
+    {
+        moduleInfo.ReportError("Expected to find opening body brace for function(%.*s).", nullptr, fnDecl->GetNameSize(), fnDecl->GetName());
+        return false;
+    }
+
+    ASTSequence* currentSequence = fnDecl->body;
+
+    Token* token = nullptr;
+    if (!moduleInfo.GetToken(&token))
+    {
+        moduleInfo.ReportError("Expected to find 'closing bracket'.", nullptr);
+        return false;
+    }
+
+    if (token->type != TokenType::RBRACE)
+    {
+        ZoneScopedNC("ParseFunctionBody::ParseBody", tracy::Color::Red)
+
+        // Parse Function Body
+        while (true)
+        {
+            ZoneScopedNC("ParseFunctionBody::Iteration", tracy::Color::Red1)
+
+            Token* startToken = nullptr;
+            if (!moduleInfo.EatToken(&startToken) || (startToken->type != TokenType::IDENTIFIER && startToken->type != TokenType::KEYWORD))
+            {
+                moduleInfo.ReportError("Expected to find identifier or keyword.", nullptr);
+                return false;
+            }
+
+            if (startToken->type == TokenType::IDENTIFIER)
+            {
+                ZoneScopedNC("Iteration::Identifier", tracy::Color::Red2)
+                if (startToken->subType == TokenSubType::FUNCTION_CALL)
+                {
+                    ZoneScopedNC("Identifier::FunctionCall", tracy::Color::Red3)
+                    ASTFunctionCall* fnCall = moduleInfo.GetFunctionCall();
+                    fnCall->UpdateToken(startToken);
+
+                    if (!ParseFunctionCall(moduleInfo, fnDecl, fnCall))
+                        return false;
+
+                    currentSequence->left = fnCall;
+                }
+                else
+                {
+                    ZoneScopedNC("Identifier::Variable", tracy::Color::Red3)
+
+                    ASTVariable* variable = moduleInfo.GetVariable();
+                    moduleInfo.InitVariable(variable, startToken, fnDecl);
+
+                    bool isDeclared = variable->parent;
+
+                    Token* declToken = nullptr;
+                    if (!moduleInfo.EatToken(&declToken) || (declToken->type != TokenType::DECLARATION && !declToken->IsAssignOperator()))
+                    {
+                        moduleInfo.ReportError("Expected to find 'Declaration' or 'Assignment' for Variable(%.*s).", nullptr, startToken->valueSize, startToken->value);
+                        return false;
+                    }
+
+                    if (declToken->type == TokenType::DECLARATION)
+                    {
+                        ZoneScopedNC("Variable::Declaration", tracy::Color::Red4)
+                        if (declToken->subType == TokenSubType::NONE || declToken->subType == TokenSubType::CONST_DECLARATION)
+                        {
+                            ZoneScopedNC("Declaration::NonAssign", tracy::Color::Purple)
+                            Token* dataTypeToken = nullptr;
+                            if (!moduleInfo.EatToken(&dataTypeToken) || dataTypeToken->type != TokenType::DATATYPE)
+                            {
+                                moduleInfo.ReportError("Expected to find data type for parameter(%.*s).", nullptr, declToken->valueSize, declToken->value);
+                                return false;
+                            }
+
+                            if (!isDeclared)
+                            {
+                                NaiType type = GetTypeFromChar(dataTypeToken->value, dataTypeToken->valueSize);
+                                variable->dataType->UpdateToken(dataTypeToken);
+                                variable->dataType->SetType(type);
+                            }
+
+                            Token* assignToken = nullptr;
+                            if (!moduleInfo.GetToken(&assignToken) || (assignToken->type != TokenType::OP_ASSIGN && assignToken->type != TokenType::END_OF_LINE))
+                            {
+                                moduleInfo.ReportError("Expected to find 'assignment operator' or 'end of line' for variable(%.*s).", nullptr, variable->GetNameSize(), variable->GetName());
+                                return false;
+                            }
+
+                            if (assignToken->type == TokenType::OP_ASSIGN)
+                            {
+                                // Eat OP_ASSIGN
+                                moduleInfo.EatToken();
+
+                                variable->expression = moduleInfo.GetExpression();
+                                if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
+                                    return false;
+                            }
+                        }
+                        else if (declToken->subType == TokenSubType::DECLARATION_ASSIGN || declToken->subType == TokenSubType::CONST_DECLARATION_ASSIGN)
+                        {
+                            variable->dataType->SetType(NaiType::AUTO);
+
+                            variable->expression = moduleInfo.GetExpression();
+                            if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
+                                return false;
+                        }
+                    }
+                    else if (declToken->IsAssignOperator())
+                    {
+                        if (!isDeclared)
+                        {
+                            // Assignment to undeclared variable
+                            moduleInfo.ReportError("Use of undeclared variable(%.*s).", nullptr, startToken->valueSize, startToken->value);
+                            return false;
+                        }
+
+                        variable->expression = moduleInfo.GetExpression();
+                        if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
+                            return false;
+                    }
+
+                    currentSequence->left = variable;
+                }
+
+                Token* nextToken = nullptr;
+                if (!moduleInfo.EatToken(&nextToken) || nextToken->type != TokenType::END_OF_LINE)
+                {
+                    moduleInfo.ReportError("Expected to find 'End of Line'.", nullptr);
+                    return false;
+                }
+
+            }
+            else if (startToken->type == TokenType::KEYWORD)
+            {
+                // This catches all unallowed keywords (Functions, Structs, Enums, Breaks and Continues)
+                if (startToken->subType <= TokenSubType::KEYWORD_CONTINUE)
+                {
+                    if (startToken->subType >= TokenSubType::KEYWORD_BREAK)
+                    {
+                        moduleInfo.ReportError("Continue/Break is not allowed outside of a 'for' or 'while' loop.", nullptr);
+                        return false;
+                    }
+                    else
+                    {
+                        moduleInfo.ReportError("Nested Functions, Structs or Enums are not allowed.", nullptr);
+                        return false;
+                    }
+                }
+
+                if (startToken->subType == TokenSubType::KEYWORD_ELSEIF)
+                {
+                    moduleInfo.ReportError("Found 'elseif' without parenting 'if statement'.", nullptr);
+                    return false;
+                }
+
+                // Parses both 'if & 'elseif'
+                if (startToken->subType == TokenSubType::KEYWORD_IF)
+                {
+                    ASTIfStatement* ifStmt = moduleInfo.GetIfStatement();
+                    ifStmt->UpdateToken(startToken);
+                    ifStmt->type = IFStatementType::IF;
+
+                    if (!ParseIfStatement(moduleInfo, fnDecl, ifStmt))
+                        return false;
+
+                    currentSequence->left = ifStmt;
+                }
+                else if (startToken->subType == TokenSubType::KEYWORD_RETURN)
+                {
+                    ASTReturnStatement* returnStmt = moduleInfo.GetReturnStatement();
+
+                    Token* expressionToken = nullptr;
+                    if (!moduleInfo.GetToken(&expressionToken))
+                    {
+                        moduleInfo.ReportError("Expected to find 'end of line' for return statement.", nullptr);
+                        return false;
+                    }
+
+                    if (expressionToken->type != TokenType::END_OF_LINE)
+                    {
+                        if (fnDecl->returnType->GetType() == NaiType::NAI_VOID)
+                        {
+                            moduleInfo.ReportError("Unexpected return value for function(%.*s) with return type 'void'.", nullptr, fnDecl->GetNameSize(), fnDecl->GetName());
+                            return false;
+                        }
+
+                        returnStmt->value = moduleInfo.GetExpression();
+                        returnStmt->value->UpdateToken(expressionToken);
+
+                        if (!ParseExpression(moduleInfo, fnDecl, returnStmt->value))
+                            return false;
+
+                        Token* endToken = nullptr;
+                        if (!moduleInfo.EatToken(&endToken) || endToken->type != TokenType::END_OF_LINE)
+                        {
+                            moduleInfo.ReportError("Expected to find 'end of line' for return statement.", nullptr);
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        // Eat END_OF_LINE
+                        moduleInfo.EatToken();
+                    }
+
+
+                    currentSequence->left = returnStmt;
+                }
+            }
+
+            currentSequence->right = moduleInfo.GetSequence();
+            currentSequence = currentSequence->right;
+
+            Token* endToken = nullptr;
+            if (!moduleInfo.GetToken(&endToken))
+            {
+                moduleInfo.ReportError("Expected to find 'closing bracket'.", nullptr);
+                return false;
+            }
+
+            if (endToken->type == TokenType::RBRACE)
+                break;
+        }
+    }
+
+    // Eat RightBrace
+    moduleInfo.EatToken();
+    return true;
+}
+bool Parser::ParseFunctionCall(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTFunctionCall* out)
+{
+    ZoneScopedNC("Parser::ParseFunctionCall", tracy::Color::Blue4)
+
+    Token* leftParen = nullptr;
+    if (!moduleInfo.EatToken(&leftParen) || leftParen->type != TokenType::LPAREN)
+    {
+        moduleInfo.ReportError("Expected to find opening parentheses for function call(%.*s).", nullptr, out->GetNameSize(), out->GetName());
+        return false;
+    }
+
+    Token* token = nullptr;
+    if (!moduleInfo.GetToken(&token))
+    {
+        moduleInfo.ReportError("Expected to find 'closing parentheses'.", nullptr);
+        return false;
+    }
+
+    if (token->type != TokenType::RPAREN)
+    {
+        // Parse Parameter List
+        while (true)
+        {
+            Token* argToken = nullptr;
+            if (!moduleInfo.EatToken(&argToken) || (argToken->type != TokenType::IDENTIFIER && argToken->type != TokenType::LITERAL))
+            {
+                moduleInfo.ReportError("Expected to find 'identifier' or 'literal' for argument.", nullptr);
+                return false;
+            }
+
+            ASTFunctionArgument* argument = moduleInfo.GetFunctionArgument();
+            if (argToken->type == TokenType::IDENTIFIER)
+            {
+                if (argToken->subType == TokenSubType::FUNCTION_CALL)
+                {
+                    ASTFunctionCall* fnCall = moduleInfo.GetFunctionCall();
+                    fnCall->UpdateToken(argToken);
+
+                    if (!ParseFunctionCall(moduleInfo, fnDecl, fnCall))
+                        return false;
+
+                    argument->value = fnCall;
+                }
+                else
+                {
+                    ASTVariable* variable = moduleInfo.GetVariable();
+                    moduleInfo.InitVariable(variable, argToken, fnDecl);
+
+                    bool isDeclared = variable->parent;
+
+                    if (!isDeclared)
+                    {
+                        // Assignment to undeclared variable
+                        moduleInfo.ReportError("Use of undeclared variable(%.*s).", nullptr, variable->GetNameSize(), variable->GetName());
+                        return false;
+                    }
+
+                    argument->value = variable;
+                }
+            }
+            else if (argToken->type == TokenType::LITERAL)
+            {
+                ASTValue* param = moduleInfo.GetValue();
+                param->UpdateToken(argToken);
+                param->UpdateValue();
+
+                argument->value = param;
+            }
+
+            Token* expressionSequenceToken = nullptr;
+            if (!moduleInfo.GetToken(&expressionSequenceToken))
+            {
+                moduleInfo.ReportError("Expected to find 'right parentheses' for function argument(Name: %.*s).", nullptr, argToken->valueSize, argToken->value);
+                return false;
+            }
+
+            if (expressionSequenceToken->IsExpressionOperator())
+            {
+                // Eat expressionSequenceToken
+                moduleInfo.EatToken();
+
+                ASTExpression* expression = moduleInfo.GetExpression();
+                expression->left = argument->value;
+                expression->right = moduleInfo.GetExpression();
+
+                argument->value = expression;
+                out->AddArgument(argument);
+
+                if (!ParseExpression(moduleInfo, fnDecl, expression))
+                    return false;
+            }
+            else
+            {
+                out->AddArgument(argument);
+            }
+
+            Token* terminatorToken = nullptr;
+            if (!moduleInfo.GetToken(&terminatorToken) || (terminatorToken->type != TokenType::PARAM_SEPERATOR && terminatorToken->type != TokenType::RPAREN))
+            {
+                moduleInfo.ReportError("Expected to find 'parameter seperator' or 'right parentheses' for function argument(Name: %.*s).", nullptr, argToken->valueSize, argToken->value);
+                return false;
+            }
+            
+            if (terminatorToken->type == TokenType::PARAM_SEPERATOR)
+            {
+                // Eat PARAM_SEPERATOR
+                moduleInfo.EatToken();
+            }
+            else if (terminatorToken->type == TokenType::RPAREN)
+            {
+                break;
+            }
+        }
+    }
+
+    // Eat RightParen
+    moduleInfo.EatToken();
+
+    return true;
+}
+bool Parser::ParseExpression(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTExpression* out)
+{
+    ZoneScopedNC("Parser::ParseExpression", tracy::Color::AliceBlue)
+
+    Token* token = nullptr;
+    if (!moduleInfo.GetToken(&token) || (token->type != TokenType::IDENTIFIER && token->type != TokenType::LITERAL))
+    {
+        moduleInfo.ReportError("Expected to find variable OR literal for expression value.", nullptr);
+        return false;
+    }
+
+    // Eat token
+    moduleInfo.EatToken();
+
+    ASTNode* valuePtr = nullptr;
+    if (token->type == TokenType::IDENTIFIER)
+    {
+        if (token->subType == TokenSubType::FUNCTION_CALL)
+        {
+            ASTFunctionCall* fnCall = moduleInfo.GetFunctionCall();
+
+            if (!ParseFunctionCall(moduleInfo, fnDecl, fnCall))
+                return false;
+
+            valuePtr = fnCall;
+        }
+        else
+        {
+            ASTVariable* variable = moduleInfo.GetVariable();
+            moduleInfo.InitVariable(variable, token, fnDecl);
+
+            bool isDeclared = variable->parent;
+
+            if (!isDeclared)
+            {
+                // Assignment to undeclared variable
+                moduleInfo.ReportError("Use of undeclared variable(%.*s).", nullptr, variable->GetNameSize(), variable->GetName());
+                return false;
+            }
+
+            valuePtr = variable;
+        }
+    }
+    else if (token->type == TokenType::LITERAL)
+    {
+        ASTValue* value = moduleInfo.GetValue();
+        value->UpdateToken(token);
+        value->UpdateValue();
+
+        valuePtr = value;
+    }
+
+    Token* expressionSequenceToken = nullptr;
+    if (!moduleInfo.GetToken(&expressionSequenceToken))
+    {
+        moduleInfo.ReportError("Expected 'end of line' for expression.", nullptr);
+        return false;
+    }
+
+    if (expressionSequenceToken->IsExpressionOperator())
+    {
+        // Eat expressionSequenceToken
+        moduleInfo.EatToken();
+
+        out->left = valuePtr;
+        if (!out->UpdateOperator(expressionSequenceToken))
+        {
+            moduleInfo.ReportError("Expected expressional operator for expression value.", nullptr);
+            return false;
+        }
+
+        Token* leftParenthesesToken = nullptr;
+        if (!moduleInfo.GetToken(&leftParenthesesToken))
+        {
+            moduleInfo.ReportError("Expected 'expressional operator', 'param seperator', 'right parentheses' or 'end of line' for expression.", nullptr);
+            return false;
+        }
+
+        ASTExpression* rightExpression = moduleInfo.GetExpression();
+        out->right = rightExpression;
+
+        // Convert "If" statement into recursive function call (ParseSubExpression)
+        if (leftParenthesesToken->type == TokenType::LPAREN)
+        {
+            // Eat LPAREN
+            moduleInfo.EatToken();
+
+            ASTExpression* expression = moduleInfo.GetExpression();
+            rightExpression->left = expression;
+
+            if (!ParseExpression(moduleInfo, fnDecl, expression))
+                return false;
+
+            Token* rightParenthesesToken = nullptr;
+            if (!moduleInfo.EatToken(&rightParenthesesToken) || rightParenthesesToken->type != TokenType::RPAREN)
+            {
+                moduleInfo.ReportError("Missing closing parentheses.", nullptr);
+                return false;
+            }
+        }
+        else
+        {
+            if (!ParseExpression(moduleInfo, fnDecl, rightExpression))
+                return false;
+        }
+    }
+    else
+    {
+        if (!out->left)
+        {
+            out->left = valuePtr;
+        }
+        else
+        {
+            out->right = valuePtr;
+        }
+    }
+
+    return true;
+}
+bool Parser::ParseIfStatement(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out)
+{
+    ZoneScopedNC("Parser::ParseIfStatement", tracy::Color::BlueViolet)
+
+    out->body = moduleInfo.GetSequence();
+
+    // We only Parse a condition if we see an "if" or "elseif"
+    if (out->type != IFStatementType::ELSE)
+    {
+        out->condition = moduleInfo.GetExpression();
+
+        if (!ParseIfStatementCondition(moduleInfo, fnDecl, out))
+            return false;
+    }
+
+    if (!ParseIfStatementBody(moduleInfo, fnDecl, out))
+        return false;
+
+    if (!ParseIfStatementSequence(moduleInfo, fnDecl, out))
+        return false;
+
+    return true;
+}
+bool Parser::ParseIfStatementCondition(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out)
+{
+    ZoneScopedNC("Parser::ParseIfStatementCondition", tracy::Color::BlueViolet)
+
+    Token* leftParen = nullptr;
+    if (!moduleInfo.EatToken(&leftParen) || leftParen->type != TokenType::LPAREN)
+    {
+        moduleInfo.ReportError("Expected to find opening if parentheses.", nullptr);
+        return false;
+    }
+
+    if (!ParseExpression(moduleInfo, fnDecl, out->condition))
+        return false;
+
+    Token* rightParen = nullptr;
+    if (!moduleInfo.EatToken(&rightParen) || rightParen->type != TokenType::RPAREN)
+    {
+        moduleInfo.ReportError("Expected to find closing if parentheses.", nullptr);
+        return false;
+    }
+
+    return true;
+}
+bool Parser::ParseIfStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out)
+{
+    ZoneScopedNC("Parser::ParseIfStatementBody", tracy::Color::BlueViolet)
+
+    Token* leftBrace = nullptr;
+    if (!moduleInfo.EatToken(&leftBrace) || leftBrace->type != TokenType::LBRACE)
+    {
+        moduleInfo.ReportError("Expected to find 'opening brace' for if statement(%.*s).", nullptr, out->GetNameSize(), out->GetName());
+        return false;
+    }
+
+    ASTSequence* currentSequence = out->body;
+
+    Token* token = nullptr;
+    if (!moduleInfo.GetToken(&token))
+    {
+        moduleInfo.ReportError("Expected to find 'closing brace' for if statement(%.*s).", nullptr, out->GetNameSize(), out->GetName());
+        return false;
+    }
+
+    if (token->type != TokenType::RBRACE)
+    {
+        ZoneScopedNC("ParseIfStatementBody::ParseBody", tracy::Color::Red)
+
+        // Parse Function Body
+        while (true)
+        {
+            ZoneScopedNC("ParseIfStatementBody::Iteration", tracy::Color::Red1)
+
+            Token* startToken = nullptr;
+            if (!moduleInfo.EatToken(&startToken) || (startToken->type != TokenType::IDENTIFIER && startToken->type != TokenType::KEYWORD))
+            {
+                moduleInfo.ReportError("Expected to find identifier or keyword.", nullptr);
+                return false;
+            }
+
+            if (startToken->type == TokenType::IDENTIFIER)
+            {
+                ZoneScopedNC("Iteration::Identifier", tracy::Color::Red2)
+
+                if (startToken->subType == TokenSubType::FUNCTION_CALL)
+                {
+                    ZoneScopedNC("Identifier::FunctionCall", tracy::Color::Red3)
+                    
+                    ASTFunctionCall* fnCall = moduleInfo.GetFunctionCall();
+                    fnCall->UpdateToken(startToken);
+
+                    if (!ParseFunctionCall(moduleInfo, fnDecl, fnCall))
+                        return false;
+
+                    currentSequence->left = fnCall;
+                }
+                else
+                {
+                    ZoneScopedNC("Identifier::Variable", tracy::Color::Red3)
+
+                    ASTVariable* variable = moduleInfo.GetVariable();
+                    moduleInfo.InitVariable(variable, startToken, fnDecl);
+
+                    bool isDeclared = variable->parent;
+
+                    Token* declToken = nullptr;
+                    if (!moduleInfo.EatToken(&declToken) || (declToken->type != TokenType::DECLARATION && !declToken->IsAssignOperator()))
+                    {
+                        moduleInfo.ReportError("Expected to find 'Declaration' or 'Assignment' for Variable(%.*s).", nullptr, startToken->valueSize, startToken->value);
+                        return false;
+                    }
+
+                    if (declToken->type == TokenType::DECLARATION)
+                    {
+                        ZoneScopedNC("Variable::Declaration", tracy::Color::Red4)
+                        if (declToken->subType == TokenSubType::NONE || declToken->subType == TokenSubType::CONST_DECLARATION)
+                        {
+                            ZoneScopedNC("Declaration::NonAssign", tracy::Color::Purple)
+                            
+                            Token* dataTypeToken = nullptr;
+                            if (!moduleInfo.EatToken(&dataTypeToken) || dataTypeToken->type != TokenType::DATATYPE)
+                            {
+                                moduleInfo.ReportError("Expected to find data type for parameter(%.*s).", nullptr, declToken->valueSize, declToken->value);
+                                return false;
+                            }
+
+                            if (!isDeclared)
+                            {
+                                NaiType type = GetTypeFromChar(dataTypeToken->value, dataTypeToken->valueSize);
+                                variable->dataType->UpdateToken(dataTypeToken);
+                                variable->dataType->SetType(type);
+                            }
+
+                            Token* assignToken = nullptr;
+                            if (!moduleInfo.GetToken(&assignToken) || (assignToken->type != TokenType::OP_ASSIGN && assignToken->type != TokenType::END_OF_LINE))
+                            {
+                                moduleInfo.ReportError("Expected to find 'assignment operator' or 'end of line' for variable(%.*s).", nullptr, variable->GetNameSize(), variable->GetName());
+                                return false;
+                            }
+
+                            if (assignToken->type == TokenType::OP_ASSIGN)
+                            {
+                                // Eat OP_ASSIGN
+                                moduleInfo.EatToken();
+
+                                variable->expression = moduleInfo.GetExpression();
+                                if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
+                                    return false;
+                            }
+                        }
+                        else if (declToken->subType == TokenSubType::DECLARATION_ASSIGN || declToken->subType == TokenSubType::CONST_DECLARATION_ASSIGN)
+                        {
+                            variable->dataType->SetType(NaiType::AUTO);
+
+                            variable->expression = moduleInfo.GetExpression();
+                            if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
+                                return false;
+                        }
+                    }
+                    else if (declToken->IsAssignOperator())
+                    {
+                        if (!isDeclared)
+                        {
+                            // Assignment to undeclared variable
+                            moduleInfo.ReportError("Use of undeclared variable(%.*s).", nullptr, startToken->valueSize, startToken->value);
+                            return false;
+                        }
+
+                        variable->expression = moduleInfo.GetExpression();
+                        if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
+                            return false;
+                    }
+
+                    currentSequence->left = variable;
+                }
+
+                Token* nextToken = nullptr;
+                if (!moduleInfo.EatToken(&nextToken) || nextToken->type != TokenType::END_OF_LINE)
+                {
+                    moduleInfo.ReportError("Expected to find 'End of Line'.", nullptr);
+                    return false;
+                }
+
+            }
+            else if (startToken->type == TokenType::KEYWORD)
+            {
+                // This catches all unallowed keywords (Functions, Structs, Enums, Breaks and Continues)
+                if (startToken->subType <= TokenSubType::KEYWORD_CONTINUE)
+                {
+                    if (startToken->subType >= TokenSubType::KEYWORD_BREAK)
+                    {
+                        moduleInfo.ReportError("Continue/Break is not allowed outside of a 'for'/'while' loop.", nullptr);
+                        return false;
+                    }
+                    else
+                    {
+                        moduleInfo.ReportError("Nested Functions, Structs or Enums are not allowed.", nullptr);
+                        return false;
+                    }
+                }
+
+                if (startToken->subType == TokenSubType::KEYWORD_ELSEIF)
+                {
+                    moduleInfo.ReportError("Unexpected 'elseif'.", nullptr);
+                    return false;
+                }
+
+                // Parses both 'if & 'elseif'
+                if (startToken->subType == TokenSubType::KEYWORD_IF)
+                {
+                    ASTIfStatement* ifStmt = moduleInfo.GetIfStatement();
+                    if (!ParseIfStatement(moduleInfo, fnDecl, ifStmt))
+                        return false;
+
+                    currentSequence->left = ifStmt;
+                }
+            }
+
+            currentSequence->right = moduleInfo.GetSequence();
+            currentSequence = currentSequence->right;
+
+            Token* endToken = nullptr;
+            if (!moduleInfo.GetToken(&endToken))
+            {
+                moduleInfo.ReportError("Expected to find 'closing brace' for if statement(%.*s).", nullptr, out->GetNameSize(), out->GetName());
+                return false;
+            }
+
+            if (endToken->type == TokenType::RBRACE)
+                break;
+        }
+    }
+
+    // Eat RightBrace
+    moduleInfo.EatToken();
+
+    return true;
+}
+bool Parser::ParseIfStatementSequence(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl , ASTIfStatement* out)
+{
+    ZoneScopedNC("Parser::ParseIfStatementSequence", tracy::Color::BlueViolet)
     
-    const Token* nextToken = parser.GetToken();
-    if (nextToken->IsExpressionOperator())
+    Token* sequenceToken = nullptr;
+    if (!moduleInfo.GetToken(&sequenceToken))
     {
-        // Skip Operator Index
-        parser.IncrementIndex();
-
-        ASTOperator* op = new ASTOperator(nextToken);
-        op->left = node;
-        op->right = ParseExpression(parser);
-
-        return op;
+        moduleInfo.ReportError("Expected to find 'closing bracket'.", nullptr);
+        return false;
     }
 
-    return node;
-}
-
-ASTNode* Parser::ParseKeywordWhile(ModuleParser& /*parser*/)
-{
-    return nullptr;
-}
-ASTNode* Parser::ParseKeywordIf(ModuleParser& /*parser*/)
-{
-    return nullptr;
-}
-ASTNode* Parser::ParseKeywordFor(ModuleParser& /*parser*/)
-{
-    return nullptr;
-}
-ASTNode* Parser::ParseKeywordReturn(ModuleParser& parser)
-{
-    const Token* token = parser.GetToken();
-    ASTFunctionReturn* fnReturn = new ASTFunctionReturn(token);
-
-    // Skip Return Token Index
-    parser.IncrementIndex();
-
-    const Token* nextToken = parser.GetToken();
-    if (nextToken->type != TokenType::END_OF_LINE)
+    if (sequenceToken->type == TokenType::KEYWORD)
     {
-        fnReturn->top = ParseExpression(parser);
-
-        // Skip End of Line Index
-        parser.IncrementIndex();
-    }
-
-    return fnReturn;
-}
-
-void Parser::VisitAST(const std::vector<ASTNode*>& ast)
-{
-    for (const ASTNode* node : ast)
-    {
-        VisitNode(node);
-        printf("\n");
-    }
-}
-void Parser::VisitNode(const ASTNode* node)
-{
-    if (!node)
-        return;
-
-    // SEQUENCES don't hold tokens, so we deal with them first
-    if (node->type == ASTNodeType::SEQUENCE)
-    {
-        const ASTSequence* sequence = reinterpret_cast<const ASTSequence*>(node);
-        printf("Sequence\n");
-
-        VisitNode(sequence->left);
-        VisitNode(sequence->right);
-        return;
-    }
-
-    const std::string_view& nodeName = node->GetName();
-    const int nodeNameSize = node->GetNameSize();
-    
-    if (node->type == ASTNodeType::FUNCTION_DECL)
-    {
-        const ASTFunctionDecl* fn = reinterpret_cast<const ASTFunctionDecl*>(node);
-
-        const std::string_view& returnTypeName = fn->returnType->GetName();
-        const int returnTypeNameSize = fn->returnType->GetNameSize();
-
-        printf("Function (Name: %.*s), (Param Count: %zu), (Return Type: %.*s)\n", nodeNameSize, nodeName.data(), fn->parameters.size(), returnTypeNameSize, returnTypeName.data());
-        
-        size_t paramCount= 1;
-        for (const ASTFunctionParam* param : fn->parameters)
+        if (sequenceToken->subType == TokenSubType::KEYWORD_ELSEIF || sequenceToken->subType == TokenSubType::KEYWORD_ELSE)
         {
-            const std::string_view& paramName = param->GetName();
-            const int paramNameSize = param->GetNameSize();
+            // We have already seen an "else", but elseif or else was seen again
+            if (out->type == IFStatementType::ELSE)
+            {
+                moduleInfo.ReportError("Unexpected 'elseif' or 'else' found where 'else' has already been seen to complete if chain.", nullptr);
+                return false;
+            }
 
-            const std::string_view& dataTypeName = param->dataType->GetName();
-            const int dataTypeNameSize = param->dataType->GetNameSize();
+            out->next = moduleInfo.GetIfStatement();
+            out->next->UpdateToken(sequenceToken);
 
-            printf("Function Param %zu: (Name: %.*s), (DataType: %.*s), (Default Value: %s)\n", paramCount++, paramNameSize, paramName.data(), dataTypeNameSize, dataTypeName.data(), param->defaultValue ? "Yes" : "No");
+            if (sequenceToken->subType == TokenSubType::KEYWORD_ELSEIF)
+            {
+                out->next->type = IFStatementType::ELSEIF;
+            }
+            else
+            {
+                out->next->type = IFStatementType::ELSE;
+            }
+
+            // Eat SequenceToken
+            moduleInfo.EatToken();
+
+            if (!ParseIfStatement(moduleInfo, fnDecl, out->next))
+                return false;
+        }
+    }
+
+    return true;
+}
+
+bool Parser::CheckFunctionParameters(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
+{
+    for (ASTFunctionParameter* parameter : fnDecl->GetParameters())
+    {
+        NaiType dataType = parameter->dataType->GetType();
+
+        // Here we need to run a check if we've seen the custom type, if not report this error
+        if (dataType == NaiType::CUSTOM)
+        {
+            moduleInfo.ReportError("Found function(%.*s) parameter with undeclared type.", parameter->dataType->token, fnDecl->GetNameSize(), fnDecl->GetName());
+            return false;;
         }
 
-        VisitNode(fn->top);
-
-        printf("\n");
-    }
-    else if (node->type == ASTNodeType::FUNCTION_CALL)
-    {
-        const ASTFunctionCall* fn = reinterpret_cast<const ASTFunctionCall*>(node);
-
-        const std::string_view& fnName = fn->GetName();
-        const int fnNameSize = fn->GetNameSize();
-
-        printf("Function Call (Name: %.*s), (Param Count: %zu)\n", fnNameSize, fnName.data(), fn->parameters.size());
-
-        size_t paramCount = 1;
-        for (const ASTNode* param : fn->parameters)
+        if (parameter->expression)
         {
-            const std::string_view& paramName = param->GetName();
-            const int paramNameSize = param->GetNameSize();
+            NaiType valueType;
+            if (!GetTypeFromExpression(moduleInfo, valueType, parameter->expression))
+                return false;
 
-            if (param->type == ASTNodeType::EXPRESSION)
+            if (dataType != valueType)
             {
-                const std::string& typeName = Token::TypeToString(param->token->type);
-
-                printf("Function Param %zu: (Value: %.*s), (Type: %s)\n", paramCount++, paramNameSize, paramName.data(), typeName.c_str());
-            }
-            else if (param->type == ASTNodeType::FUNCTION_CALL)
-            {
-                printf("Function Param %zu (Name: %.*s) BEGIN {\n", paramCount, paramNameSize, paramName.data());
-                VisitNode(param);
-                printf("Function Param %zu (Name: %.*s) END }\n", paramCount++, paramNameSize, paramName.data());
-            }
-            else if (param->type == ASTNodeType::OPERATOR)
-            {
-                const ASTOperator* paramNode = reinterpret_cast<const ASTOperator*>(param);
-                const std::string& typeName = Token::TypeToString(param->token->type);
-
-                printf("Function Param %zu (Name: %s) BEGIN {\n", paramCount, typeName.c_str());
-                VisitNode(paramNode->left);
-                VisitNode(paramNode->right);
-                printf("Function Param %zu (Name: %s) END }\n", paramCount++, typeName.c_str());
+                // TODO: Handle mismatch between numeric, strings & structs
+                moduleInfo.ReportWarning("Mismatching data type for parameter(%.*s) between lVal and rVal.", parameter->token, parameter->GetNameSize(), parameter->GetName());
             }
         }
     }
-    else if (node->type == ASTNodeType::FUNCTION_RETURN)
-    {
-        const ASTFunctionReturn* fnReturn = reinterpret_cast<const ASTFunctionReturn*>(node);
 
-        printf("Function Return: BEGIN {\n");
-        VisitNode(fnReturn->top);
-        printf("Function Return: END {\n");
+    return true;
+}
+bool Parser::CheckFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
+{
+    ASTDataType* returnType = fnDecl->returnType;
+    bool missingReturnStmt = returnType->GetType() != NaiType::NAI_VOID;
+
+    ASTSequence* nextSequence = fnDecl->body;
+    if (!nextSequence->left)
+    {
+        moduleInfo.ReportWarning("Found function with no body.", fnDecl->token);
+        return false;;
     }
-    else if (node->type == ASTNodeType::OPERATOR)
+
+    while (nextSequence)
     {
-        const ASTOperator* op = reinterpret_cast<const ASTOperator*>(node);
-        const std::string& typeName = Token::TypeToString(op->token->type);
+        ASTNode* left = nextSequence->left;
+        if (!left)
+            break;
 
-        printf("Operator: (Name: %s) BEGIN {\n", typeName.c_str());
-        VisitNode(op->left);
-        VisitNode(op->right);
-        printf("Operator: (Name: %s) END {\n", typeName.c_str());
-    }
-    else if (node->type == ASTNodeType::EXPRESSION)
-    {
-        const ASTExpression* expression = reinterpret_cast<const ASTExpression*>(node);
-        const std::string& type = expression->GetTypeName();
+        NaiType type = NaiType::INVALID;
+        ASTNode* typeNode = nullptr;
 
-        printf("Expression: (Value: %.*s), (Type: %s)\n", nodeNameSize, nodeName.data(), type.c_str());
-    }
-    else if (node->type == ASTNodeType::STRUCT)
-    {
-        const ASTStruct* structNode = reinterpret_cast<const ASTStruct*>(node);
-
-        printf("Struct (Name: %.*s), (Variables: %zu), (Functions: %zu)\n", nodeNameSize, nodeName.data(), structNode->variables.size(), structNode->functions.size());
-
-        printf("{\n");
-        for (const ASTVariable* variable : structNode->variables)
+        if (left->type == ASTNodeType::VARIABLE)
         {
-            VisitNode(variable);
+            ASTVariable* variable = static_cast<ASTVariable*>(left);
+            ASTDataType* dataType = variable->GetDataType();
+
+            type = dataType->GetType();
+            typeNode = variable;
+
+            if (variable->expression)
+            {
+                NaiType valueType;
+                if (!GetTypeFromExpression(moduleInfo, valueType, variable->expression))
+                    return false;
+
+                if (type != valueType)
+                {
+                    // TODO: Handle mismatch between numeric, strings & structs
+                    moduleInfo.ReportWarning("Mismatching data type for variable(%.*s) between lVal and rVal.", variable->token, variable->GetNameSize(), variable->GetName());
+                }
+            }
+        }
+        else if (left->type == ASTNodeType::FUNCTION_CALL)
+        {
+            ASTFunctionCall* fnCall = static_cast<ASTFunctionCall*>(left);
+            ASTFunctionDecl* functionDecl = moduleInfo.GetFunctionByNameHash(fnCall->GetNameHashed());
+            
+            std::vector<ASTFunctionParameter*> fnParameters = functionDecl->GetParameters();
+            std::vector<ASTFunctionArgument*> fnArguments = fnCall->GetArguments();
+
+            for (size_t i = 0; i < fnArguments.size(); i++)
+            {
+                ASTFunctionParameter* param = fnParameters[i];
+                ASTFunctionArgument* arg = fnArguments[i];
+
+                ASTNode* value = arg->value;
+                NaiType argType = NaiType::INVALID;
+
+                if (value->type == ASTNodeType::VALUE)
+                {
+                    ASTValue* litera = static_cast<ASTValue*>(value);
+
+                    NaiType dataType = GetTypeFromLiteral(litera->value);
+                    litera->dataType = moduleInfo.GetDataType();
+                    litera->dataType->SetType(dataType);
+                    argType = dataType;
+                    
+                }
+                else if (value->type == ASTNodeType::VARIABLE)
+                {
+                    ASTVariable* variable = static_cast<ASTVariable*>(value);
+                    argType = GetTypeFromVariable(variable);
+
+                }
+                else if (value->type == ASTNodeType::FUNCTION_CALL)
+                {
+                    ASTFunctionCall* fnCallArg = static_cast<ASTFunctionCall*>(value);
+                    argType = GetTypeFromFunctionCall(moduleInfo, fnCallArg);
+                }
+
+                if (argType != param->dataType->GetType())
+                {
+                    // TODO: Handle mismatch between numeric, strings & structs
+                    moduleInfo.ReportWarning("Mismatching data type for function argument(%.*s), expected type: (%.*s).", fnCall->token, arg->GetNameSize(), arg->GetName(), param->dataType->GetNameSize(), param->dataType->GetName());
+                }
+            }
+
+            type = functionDecl->returnType->GetType();
+            typeNode = fnCall;
+
+        }
+        else if (left->type == ASTNodeType::IF_STATEMENT)
+        {
+            ASTIfStatement* ifStmt = static_cast<ASTIfStatement*>(left);
+
+            // Recurisvely Parse IF Statements
+            if (!GetTypeFromExpression(moduleInfo, type, ifStmt->condition))
+                return false;
+
+        }
+        else if (left->type == ASTNodeType::RETURN_STATEMENT)
+        {
+            ASTReturnStatement* returnStmt = static_cast<ASTReturnStatement*>(left);
+
+            if (returnStmt->value)
+            {
+                if (!GetTypeFromExpression(moduleInfo, type, returnStmt->value))
+                    return false;
+
+            }
+            else
+            {
+                type = NaiType::NAI_VOID;
+            }
+
+            typeNode = returnStmt;
+            missingReturnStmt = false;
         }
 
-        printf("\n");
-        for (const ASTFunctionDecl* fnDecl : structNode->functions)
+        // Here we need to run a check if we've seen the custom type, if not report this error
+        if (type == NaiType::INVALID || type == NaiType::CUSTOM)
         {
-            VisitNode(fnDecl);
+            moduleInfo.ReportError("Undeclared data type used for (%.*s).", typeNode->token, typeNode->GetNameSize(), typeNode->GetName());
+            return false;;
         }
-        printf("}\n");
+
+        nextSequence = nextSequence->right;
     }
-    else if (node->type == ASTNodeType::VARIABLE)
+
+    if (missingReturnStmt)
     {
-        const ASTVariable* variable = reinterpret_cast<const ASTVariable*>(node);
-
-        const std::string_view& dataTypeName = variable->dataType->GetName();
-        const int dataTypeNameSize = variable->dataType->GetNameSize();
-
-        printf("Variable: (Name: %.*s), (DataType: %.*s)\n", nodeNameSize, nodeName.data(), dataTypeNameSize, dataTypeName.data());
-        VisitNode(variable->value);
+        moduleInfo.ReportError("Found function with no return statement, function expected to return type of (%.*s).", returnType->token, returnType->GetNameSize(), returnType->GetName());
     }
+
+    return true;
+}
+
+bool Parser::GetTypeFromExpression(ModuleInfo& moduleInfo, NaiType& outType, ASTExpression* expression)
+{
+    ASTNode* left = expression->left;
+    NaiType lType = NaiType::INVALID;
+    {
+        if (left->type == ASTNodeType::VALUE)
+        {
+            ASTValue* litera = static_cast<ASTValue*>(left);
+            litera->dataType = moduleInfo.GetDataType();
+
+            NaiType dataType = GetTypeFromLiteral(litera->value);
+            litera->dataType->SetType(dataType);
+
+            lType = dataType;
+        }
+        else if (left->type == ASTNodeType::VARIABLE)
+        {
+            ASTVariable* variable = static_cast<ASTVariable*>(left);
+            lType = GetTypeFromVariable(variable);
+        }
+        else if (left->type == ASTNodeType::FUNCTION_CALL)
+        {
+            ASTFunctionCall* fnCall = static_cast<ASTFunctionCall*>(left);
+            lType = GetTypeFromFunctionCall(moduleInfo, fnCall);
+        }
+        else if (left->type == ASTNodeType::EXPRESSION)
+        {
+            // TODO: Implement nested expression value logic here
+        }
+    }
+
+    if (lType == NaiType::INVALID)
+    {
+        moduleInfo.ReportError("Failed to parse data type for expression", left->token);
+        return false;
+    }
+
+    ASTNode* right = expression->right;
+    NaiType rType = NaiType::INVALID;
+    {
+        if (right)
+        {
+            if (right->type == ASTNodeType::EXPRESSION)
+            {
+                GetTypeFromExpression(moduleInfo, rType, static_cast<ASTExpression*>(expression->right));
+            }
+            else if (right->type == ASTNodeType::VALUE)
+            {
+                ASTValue* litera = static_cast<ASTValue*>(right);
+                litera->dataType = moduleInfo.GetDataType();
+
+                NaiType dataType = GetTypeFromLiteral(litera->value);
+                litera->dataType->SetType(dataType);
+
+                rType = dataType;
+            }
+            else if (right->type == ASTNodeType::VARIABLE)
+            {
+                ASTVariable* variable = static_cast<ASTVariable*>(left);
+                rType = GetTypeFromVariable(variable);
+            }
+            else if (right->type == ASTNodeType::FUNCTION_CALL)
+            {
+                ASTFunctionCall* fnCall = static_cast<ASTFunctionCall*>(left);
+                rType = GetTypeFromFunctionCall(moduleInfo, fnCall);
+            }
+            else if (right->type == ASTNodeType::EXPRESSION)
+            {
+                // TODO: Implement nested expression value logic here
+            }
+
+            if (rType == NaiType::INVALID)
+            {
+                moduleInfo.ReportError("Failed to parse data type for expression", right->token);
+                return false;
+            }
+        }
+    }
+
+    outType = lType;
+    return true;
+}
+NaiType Parser::GetTypeFromLiteral(uint64_t value)
+{
+    if (value < std::numeric_limits<int32_t>().max())
+        return NaiType::I32;
+    else
+    {
+        return NaiType::I64;
+    }
+
+    return NaiType::INVALID;
+}
+NaiType Parser::GetTypeFromVariable(ASTVariable* variable)
+{
+    return variable->GetDataType()->GetType();
+}
+NaiType Parser::GetTypeFromFunctionCall(ModuleInfo& moduleInfo, ASTFunctionCall* fnCall)
+{
+    ASTFunctionDecl* fnDecl = moduleInfo.GetFunctionByNameHash(fnCall->GetNameHashed());
+    return fnDecl->returnType->GetType();
 }

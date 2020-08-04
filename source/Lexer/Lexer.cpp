@@ -50,7 +50,7 @@ bool Lexer::IsDigit(char c)
 {
     return c >= '0' && c <= '9';
 }
-bool Lexer::IsNumeric(Token& token)
+bool Lexer::IsNumeric(const Token& token)
 {
     ZoneScoped;
 
@@ -60,43 +60,78 @@ bool Lexer::IsNumeric(Token& token)
     int minusCount = 0;
     int fCount = 0;
     int xCount = 0;
-    bool hexPresent = false;
 
     for (size_t i = 0; i < strSize; i++)
     {
         char tmp = token.value[i];
         switch (tmp)
         {
-        case '.':
-            if (++dotCount != 1 && i != 0 && i != strSize - 1)
-                return false;
-            break;
-        case '-':
-            if (++minusCount != 1 && i == 0)
-                return false;
-            break;
-        case 'f':
-            if ((++fCount != 1 && xCount == 0) && i == strSize - 1)
-                return false;
-            break;
-        case 'x':
-        case 'X':
-            // Hex 
-            if (++xCount != 1 && i != 1)
-                return false;
-            break;
-        default:
-            if ((tmp >= 'a' && tmp <= 'f') || (tmp >= 'A' && tmp <= 'F'))
-                hexPresent = true;
-            else if (tmp < '0' || tmp > '9')
-                return false;
-            break;
+            case '.':
+            {
+                if ((++dotCount > 1 || (i == 0 && i != strSize - 1)) || xCount > 0)
+                    return false;
+
+                break;
+            }
+            case '-':
+            {
+                if (++minusCount > 1 || i > 0)
+                    return false;
+                break;
+            }
+            case 'f':
+            {
+                ++fCount;
+
+                if (xCount == 0)
+                {
+                    if (fCount > 1)
+                        return false;
+
+                    if (i != strSize - 1)
+                        return false;
+                }
+                break;
+            }
+            case 'x':
+            case 'X':
+                // Hex 
+                if (++xCount > 1 || i > 1 || token.value[0] != '0')
+                    return false;
+                break;
+            default:
+            {
+                if (((tmp >= 'a' && tmp <= 'f') || (tmp >= 'A' && tmp <= 'F')))
+                {
+                    if (xCount == 0)
+                        return false;
+                }
+                else if (tmp < '0' || tmp > '9')
+                    return false;
+                break;
+            }
         }
     }
 
-    // If we detect hexidecimal characters check if hex format has been detected
-    if (hexPresent && xCount == 0)
+    return true;
+}
+inline bool Lexer::CheckDataTypeName(const Token& token)
+{
+    ZoneScoped;
+
+    size_t strSize = token.valueSize;
+
+    char& initialChar = token.value[0];
+    if (!IsAlpha(initialChar))
         return false;
+
+    for (size_t i = 1; i < strSize; i++)
+    {
+        char& tmp = token.value[i];
+
+        if (!IsAlpha(tmp) && !IsDigit(tmp))
+            return false;
+    }
 
     return true;
 }
@@ -266,10 +301,16 @@ void Lexer::ResolveTokenTypes(LexerFile& file, Token& token)
                 token.type = TokenType::ENUM;
                 token.subType = TokenSubType::NONE;
             }
-            else if (prevToken.subType == TokenSubType::OP_RETURN_TYPE || (prevToken.type == TokenType::DECLARATION && prevToken.subType == TokenSubType::NONE) || prevToken.subType == TokenSubType::CONST_DECLARATION)
+            else if ((prevToken.type == TokenType::DECLARATION && (prevToken.subType == TokenSubType::NONE || prevToken.subType == TokenSubType::CONST_DECLARATION)) || prevToken.subType == TokenSubType::OP_RETURN_TYPE)
             {
                 token.type = TokenType::DATATYPE;
                 token.subType = TokenSubType::NONE;
+
+                if (!CheckDataTypeName(token))
+                {
+                    ReportError(4, "Found DataType with invalid name. A DataType must start with an alphabetical character and may only consist of alphabetical characters & digits (Line: %d, Col: %d)\n", static_cast<int>(file.lineNum), static_cast<int>(file.colNum));
+                    assert(false);
+                }
             }
         }
     }

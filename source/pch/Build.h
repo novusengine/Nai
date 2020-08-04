@@ -16,8 +16,16 @@
 #error("NAI_RELEASE was not defined to either 0 or 1!");
 #endif
 
+//#define TRACY_ENABLE
+
 #ifdef TRACY_ENABLE
 #define TRACY_NO_EXIT
 #endif
 
+#define NOMINMAX
+
 #include <Tracy.hpp>
+#include <cstddef>
+#include <string>
+#include <cmath>
+#include <cassert>

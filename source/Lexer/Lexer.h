@@ -37,7 +37,8 @@ public:
 
     inline bool IsAlpha(char c);
     inline bool IsDigit(char c);
-    inline bool IsNumeric(Token& token);
+    inline bool IsNumeric(const Token& token);
+    inline bool CheckDataTypeName(const Token& token);
     inline bool HandleKeyword(Token& token);
 
     inline void ResolveTokenTypes(LexerFile& file, Token& token);

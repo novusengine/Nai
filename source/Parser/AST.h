@@ -1,54 +1,107 @@
 #pragma once
 #include <pch/Build.h>
 #include "Lexer/Token.h"
-#include "../ByteCode/ByteOpcode.h"
+#include "../NaiType.h"
+
 #include "../Utils/StringUtils.h"
+#include "../Memory/BlockContainer.h"
 
 enum class ASTNodeType : unsigned char
 {
     NONE,
     SEQUENCE,
-    OPERATOR,
     EXPRESSION,
-    DATATYPE,
+    VALUE,
     VARIABLE,
-    STRUCT,
-    ENUM,
-    ENUM_VALUE,
+    DATATYPE,
+    IF_STATEMENT,
+    RETURN_STATEMENT,
     FUNCTION_DECL,
+    FUNCTION_PARAMETER,
     FUNCTION_CALL,
-    FUNCTION_PARAM,
-    FUNCTION_RETURN,
+    FUNCTION_ARGUMENT
 };
 
+enum class ASTOperatorType : unsigned char
+{
+    NONE,
+    ASSIGN,
+    ASSIGN_ADD,
+    ASSIGN_SUBTRACT,
+    ASSIGN_MULTIPLY,
+    ASSIGN_DIVIDE,
+    ASSIGN_MODULUS,
+    ASSIGN_INCREMENT,
+    ASSIGN_DECREMENT,
+    LESS,
+    GREATER,
+    EQUALS,
+    EQUALS_LESS,
+    EUQLAS_GREATER,
+    EQUALS_NOT,
+    BITWISE_OR,
+    BITWISE_AND,
+    OR,
+    AND,
+    NOT
+};
+
+enum class IFStatementType : unsigned char
+{
+    NONE,
+    IF,
+    ELSEIF,
+    ELSE
+};
+
+#pragma pack(push, 1)
 struct ASTNode
 {
 public:
-    ASTNode(ASTNodeType inType) : token(nullptr), type(inType) { }
-    ASTNode(const Token* inToken, ASTNodeType inType) : token(inToken), type(inType) { }
-
-    std::string_view GetName() const
+    ASTNode(ASTNodeType inType)
     {
-        return std::string_view(token->value, token->valueSize);
+        type = inType;
     }
-    inline int GetNameSize() const
+    ASTNode(Token& inToken, ASTNodeType inType)
     {
+        token = &inToken;
+        type = inType;
+    }
+
+    void UpdateToken(Token* inToken)
+    {
+        token = inToken;
+    }
+
+    const char* GetName()
+    {
+        if (!token)
+            return nullptr;
+
+        return token->value;
+    }
+    int GetNameSize()
+    {
+        if (!token)
+            return 0;
+
         return token->valueSize;
     }
-    inline uint32_t GetNameHash()
-    {
-        if (_nameHash == 0)
-            _nameHash = StringUtils::fnv1a_32(token->value, token->valueSize);
 
-        return _nameHash;
-    }
-
-    const Token* token;
+    Token* token = nullptr;
     ASTNodeType type;
 
+    size_t GetNameHashed()
+    {
+        if (_hashedName == 0)
+            _hashedName = StringUtils::hash_djb2(token->value, token->valueSize);
+
+        return _hashedName;
+    }
 private:
-    uint32_t _nameHash = 0;
+    size_t _hashedName = 0;
 };
+
 struct ASTSequence : public ASTNode
 {
 public:
@@ -57,131 +110,280 @@ public:
     ASTNode* left = nullptr;
     ASTSequence* right = nullptr;
 };
-
 struct ASTExpression : public ASTNode
 {
-public:
-    ASTExpression(const Token* inToken) : ASTNode(inToken, ASTNodeType::EXPRESSION) { }
+    ASTExpression() : ASTNode(ASTNodeType::EXPRESSION) { }
 
-    const std::string GetTypeName() const
-    {
-        if (token->type == TokenType::IDENTIFIER)
-        {
-            if (token->subType == TokenSubType::FUNCTION_CALL)
-                return "Function Call";
-            else
-                return "Variable";
-        }
-        else if (token->type == TokenType::LITERAL)
-            return "Literal";
-
-        return "Invalid";
-    }
-};
-struct ASTOperator : public ASTNode
-{
-public:
-    ASTOperator(const Token* inToken) : ASTNode(inToken, ASTNodeType::OPERATOR) { }
+    ASTOperatorType op = ASTOperatorType::NONE;
 
     ASTNode* left = nullptr;
     ASTNode* right = nullptr;
+
+    bool UpdateOperator(const Token* token)
+    {
+        switch (token->subType)
+        {
+        case TokenSubType::OP_ADD_ASSIGN:
+        {
+            op = ASTOperatorType::ASSIGN;
+            return true;
+        }
+        case TokenSubType::OP_SUBTRACT_ASSIGN:
+        {
+            op = ASTOperatorType::ASSIGN_SUBTRACT;
+            return true;
+        }
+        case TokenSubType::OP_MULTIPLY_ASSIGN:
+        {
+            op = ASTOperatorType::ASSIGN_MULTIPLY;
+            return true;
+        }
+        case TokenSubType::OP_DIVIDE_ASSIGN:
+        {
+            op = ASTOperatorType::ASSIGN_DIVIDE;
+            return true;
+        }
+        case TokenSubType::OP_INCREMENT:
+        {
+            op = ASTOperatorType::ASSIGN_INCREMENT;
+            return true;
+        }
+        case TokenSubType::OP_DECREMENT:
+        {
+            op = ASTOperatorType::ASSIGN_DECREMENT;
+            return true;
+        }
+        case TokenSubType::OP_EQUALS:
+        {
+            op = ASTOperatorType::EQUALS;
+            return true;
+        }
+        case TokenSubType::OP_GREATER_EQUALS:
+        {
+            op = ASTOperatorType::EUQLAS_GREATER;
+            return true;
+        }
+        case TokenSubType::OP_LESS_EQUALS:
+        {
+            op = ASTOperatorType::EQUALS_LESS;
+            return true;
+        }
+        case TokenSubType::OP_NOT_EQUALS:
+        {
+            op = ASTOperatorType::EQUALS_NOT;
+            return true;
+        }
+        case TokenSubType::OP_AND:
+        {
+            op = ASTOperatorType::AND;
+            return true;
+        }
+        case TokenSubType::OP_OR:
+        {
+            op = ASTOperatorType::OR;
+            return true;
+        }
+
+        default:
+            break;
+        }
+
+        switch (token->type)
+        {
+        case TokenType::OP_ASSIGN:
+        {
+            op = ASTOperatorType::ASSIGN;
+            return true;
+        }
+        case TokenType::OP_ADD:
+        {
+            op = ASTOperatorType::ASSIGN_ADD;
+            return true;
+        }
+        case TokenType::OP_SUBTRACT:
+        {
+            op = ASTOperatorType::ASSIGN_SUBTRACT;
+            return true;
+        }
+        case TokenType::OP_MULTIPLY:
+        {
+            op = ASTOperatorType::ASSIGN_MULTIPLY;
+            return true;
+        }
+        case TokenType::OP_DIVIDE:
+        {
+            op = ASTOperatorType::ASSIGN_DIVIDE;
+            return true;
+        }
+        case TokenType::OP_MODULUS:
+        {
+            op = ASTOperatorType::ASSIGN_MODULUS;
+            return true;
+        }
+        case TokenType::OP_BITWISE_AND:
+        {
+            op = ASTOperatorType::BITWISE_AND;
+            return true;
+        }
+        case TokenType::OP_BITWISE_OR:
+        {
+            op = ASTOperatorType::BITWISE_OR;
+            return true;
+        }
+        case TokenType::OP_LESS:
+        {
+            op = ASTOperatorType::LESS;
+            return true;
+        }
+        case TokenType::OP_GREATER:
+        {
+            op = ASTOperatorType::GREATER;
+            return true;
+        }
+
+        default:
+            break;
+        }
+
+        return false;
+    }
 };
+
 struct ASTDataType : public ASTNode
 {
-public:
-    ASTDataType(const Token* inToken) : ASTNode(inToken, ASTNodeType::DATATYPE) { }
-};
-struct ASTVariable : public ASTNode
-{
-public:
-    ASTVariable(const Token* inToken) : ASTNode(inToken, ASTNodeType::VARIABLE) { }
+    ASTDataType() : ASTNode(ASTNodeType::DATATYPE) { }
+    ASTDataType(Token& token) : ASTNode(token, ASTNodeType::DATATYPE) { }
 
+    NaiType& GetType() { return _type; }
+    void SetType(NaiType inType) { _type = inType; }
+
+private:
+    NaiType _type = NaiType::INVALID;
+};
+struct ASTValue : public ASTNode
+{
+    ASTValue(ASTNodeType type = ASTNodeType::VALUE) : ASTNode(type) { }
+    ASTValue(Token& token, ASTNodeType type = ASTNodeType::VALUE) : ASTNode(token, type) { }
+
+    ASTDataType* dataType = nullptr;
+
+    // Numeric Constant Value
+    uint64_t value = 0;
+
+    void UpdateValue()
+    {
+        value = StringUtils::ToUInt64(token->value, token->valueSize);
+    }
+};
+struct ASTVariable : public ASTValue
+{
+    ASTVariable() : ASTValue(ASTNodeType::VARIABLE) { }
+    ASTVariable(Token& token) : ASTValue(token, ASTNodeType::VARIABLE) { }
+
+    uint64_t& GetValue()
+    {
+        if (parent)
+        {
+            return parent->value;
+        }
+
+        return value;
+    }
     ASTDataType* GetDataType()
     {
-        if (!dataType)
+        if (parent)
+        {
             return parent->dataType;
+        }
 
         return dataType;
     }
 
-    ASTDataType* dataType = nullptr;
-    ASTNode* value = nullptr;
-
+    // Originally declared variable
     ASTVariable* parent = nullptr;
-    bool isConst = false;
 
+    // Calculated Value
+    ASTExpression* expression = nullptr;
 };
 
-struct ASTFunctionParam : public ASTNode
+struct ASTIfStatement : public ASTNode
 {
-public:
-    ASTFunctionParam(const Token* inToken) : ASTNode(inToken, ASTNodeType::FUNCTION_PARAM) { }
+    ASTIfStatement() : ASTNode(ASTNodeType::IF_STATEMENT) { }
+
+    ASTExpression* condition = nullptr;
+    ASTSequence* body = nullptr;
+    ASTIfStatement* next = nullptr;
+
+    IFStatementType type = IFStatementType::NONE;
+};
+struct ASTReturnStatement : public ASTNode
+{
+    ASTReturnStatement() : ASTNode(ASTNodeType::RETURN_STATEMENT) { }
+
+    ASTExpression* value = nullptr;
+};
+
+struct ASTFunctionParameter : public ASTNode
+{
+    ASTFunctionParameter() : ASTNode(ASTNodeType::FUNCTION_PARAMETER) { }
 
     ASTDataType* dataType = nullptr;
-    ASTNode* defaultValue = nullptr;
+    ASTExpression* expression = nullptr;
 };
-
 struct ASTFunctionDecl : public ASTNode
 {
-public:
-    ASTFunctionDecl(const Token* inToken) : ASTNode(inToken, ASTNodeType::FUNCTION_DECL)
-    {
-        parameters.reserve(4);
-        variables.reserve(4);
-        opcodes.reserve(64);
+    ASTFunctionDecl() : ASTNode(ASTNodeType::FUNCTION_DECL) 
+    { 
+        _parameters.reserve(16);
+        _variables.reserve(16);
     }
 
-    std::vector<ASTFunctionParam*> parameters;
-    std::vector<ASTVariable*> variables;
+    void AddParameter(ASTFunctionParameter* param)
+    {
+        _parameters.push_back(param);
+    }
+    void AddVariable(ASTVariable* var)
+    {
+        _variables.push_back(var);
+    }
+
+    std::vector<ASTFunctionParameter*>& GetParameters()
+    {
+        return _parameters;
+    }
+    std::vector<ASTVariable*>& GetVariables()
+    {
+        return _variables;
+    }
+
     ASTDataType* returnType = nullptr;
+    ASTSequence* body = nullptr;
 
-    ASTSequence* top = new ASTSequence();
+private:
+    std::vector<ASTFunctionParameter*> _parameters;
+    std::vector<ASTVariable*> _variables;
+};
+struct ASTFunctionArgument : public ASTNode
+{
+    ASTFunctionArgument() : ASTNode(ASTNodeType::FUNCTION_ARGUMENT) { }
 
-    std::vector<ByteOpcode> opcodes;
+    ASTNode* value = nullptr;
 };
 struct ASTFunctionCall : public ASTNode
 {
-public:
-    ASTFunctionCall(const Token* inToken) : ASTNode(inToken, ASTNodeType::FUNCTION_CALL)
+    ASTFunctionCall() : ASTNode(ASTNodeType::FUNCTION_CALL) { }
+
+    void AddArgument(ASTFunctionArgument* arg)
     {
-        parameters.reserve(4);
+        _arguments.push_back(arg);
     }
 
-    std::vector<ASTNode*> parameters;
-}; 
-struct ASTFunctionReturn : public ASTNode
-{
-public:
-    ASTFunctionReturn(const Token* inToken) : ASTNode(inToken, ASTNodeType::FUNCTION_RETURN) { }
-
-    ASTNode* top = nullptr;
-};
-
-struct ASTStruct : public ASTNode
-{
-public:
-    ASTStruct(const Token* inToken) : ASTNode(inToken, ASTNodeType::STRUCT) 
+    std::vector<ASTFunctionArgument*>& GetArguments()
     {
-        variables.reserve(4);
-        functions.reserve(4);
+        return _arguments;
     }
 
-    std::vector<ASTVariable*> variables;
-    std::vector<ASTFunctionDecl*> functions;
+private:
+    std::vector<ASTFunctionArgument*> _arguments;
 };
-
-struct ASTEnumValue : public ASTNode
-{
-public:
-    ASTEnumValue(const Token* inToken) : ASTNode(inToken, ASTNodeType::ENUM_VALUE) { }
-
-    ASTDataType* dataType = nullptr;
-    ASTNode* defaultValue = nullptr;
-};
-struct ASTEnum : public ASTNode
-{
-public:
-    ASTEnum(const Token* inToken) : ASTNode(inToken, ASTNodeType::ENUM) { }
-
-    std::vector<ASTEnumValue> values;
-};
+#pragma pack(pop)

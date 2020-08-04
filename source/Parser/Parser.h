@@ -1,110 +1,232 @@
 #pragma once
 #include <pch/Build.h>
-#include <vector>
-#include <stack>
 #include "Lexer/Token.h"
 #include "Lexer/Lexer.h"
-#include "../Utils/RobingHood.h"
+#include "AST.h"
 
-struct ASTNode;
-struct ModuleParser
+#include <vector>
+#include "../Utils/RobinHood.h"
+#include "../Utils/DebugHandler.h"
+
+struct ModuleInfo
 {
-    ModuleParser(LexerFile& lexerOutput) : _lexerFile(lexerOutput) 
+    ModuleInfo(LexerFile& lexerOutput) : _tokens(lexerOutput.tokens), _tokensNum(lexerOutput.tokens.size()) 
     {
-        moduleFunctionNodes.reserve(8); // Preallocate space for 8 functions 
-        moduleStructNodes.reserve(8); // Preallocate space for 8 Structs
-        modueEnumNodes.reserve(4); // Preallocate space for 8 Enums
+        // Pre allocate 8 functions per module
+        _functionNodes.reserve(8);
     }
 
-    const LexerFile& GetLexerOutput() { return _lexerFile; }
-    std::stack<TokenType>& GetStack() { return _stack; }
-
-    const std::vector<Token>& GetTokens() { return _lexerFile.tokens; }
-    inline const Token* GetToken() 
-    { 
-        return _GetToken(_parseIndex);
-    }
-    inline const Token* GetToken(size_t offset)
+    inline bool GetToken(Token** out)
     {
-        return _GetToken(_parseIndex + offset); 
+        ZoneScopedNC("GetToken", tracy::Color::Green)
+        return _GetToken(_tokenIndex, out);
     }
-    inline const Token* GetTokenIncrement(size_t num = 1)
+    inline bool EatToken(Token** out)
     {
-        const Token* token = GetToken();
-        IncrementIndex(num);
-
-        return token;
+        ZoneScopedNC("EatToken", tracy::Color::Green1)
+        return _GetToken(_tokenIndex++, out);
+    }
+    inline bool EatToken()
+    {
+        ZoneScopedNC("EatToken", tracy::Color::Green1)
+        Token* token = nullptr;
+        return _GetToken(_tokenIndex++, &token);
+    }
+    inline bool PeekToken(Token** out)
+    {
+        ZoneScopedNC("PeekToken", tracy::Color::Green2)
+        return _GetToken(_tokenIndex + 1, out);
+    }
+    inline void SetCurrentToken(const Token* token)
+    {
+        if (token)
+        {
+            _lineNum = token->lineNum;
+            _colNum = token->colNum;
+        }
     }
 
-    std::vector<ASTNode*> moduleFunctionNodes;
-    std::vector<ASTNode*> moduleStructNodes;
-    std::vector<ASTNode*> modueEnumNodes;
+    inline const size_t& GetTokenIndex() { return _tokenIndex; }
+    inline const size_t& GetTokenCount() { return _tokensNum; }
+    inline void ResetIndex() { _tokenIndex = 0; }
 
-    inline size_t& GetIndex() { return _parseIndex; }
-    inline void IncrementIndex(size_t num = 1) { _parseIndex += num; }
-    inline void ResetIndex() { _parseIndex = 0; }
+    void AddFunctionNode(ASTFunctionDecl* fnDecl)
+    {
+        return _functionNodes.push_back(fnDecl);
+    }
+    std::vector<ASTFunctionDecl*>& GetFunctionNodes()
+    {
+        return _functionNodes;
+    }
+
+    // Helper Functions
+    void InitVariable(ASTVariable* variable, Token* token, ASTFunctionDecl* fnDecl)
+    {
+        variable->UpdateToken(token);
+        
+        size_t nameHashed = variable->GetNameHashed();
+        for (ASTVariable* var : fnDecl->GetVariables())
+        {
+            if (nameHashed == var->GetNameHashed())
+            {
+                variable->parent = var;
+                break;
+            }
+        }
+
+        // Create DataType for variable if previously undeclared
+        if (!variable->parent)
+            variable->dataType = GetDataType();
+
+        fnDecl->AddVariable(variable);
+    }
+    ASTFunctionDecl* GetFunctionByNameHash(uint32_t nameHash)
+    {
+        for (ASTFunctionDecl* fnDecl : _functionNodes)
+        {
+            if (nameHash == fnDecl->GetNameHashed())
+                return fnDecl;
+        }
+
+        return nullptr;
+    }
+
+    // Allocator Functions
+    ASTSequence* GetSequence();
+    ASTExpression* GetExpression();
+    ASTValue* GetValue();
+    ASTVariable* GetVariable();
+    ASTDataType* GetDataType();
+    ASTIfStatement* GetIfStatement();
+    ASTReturnStatement* GetReturnStatement();
+    ASTFunctionDecl* GetFunctionDecl();
+    ASTFunctionParameter* GetFunctionParameter();
+    ASTFunctionCall* GetFunctionCall();
+    ASTFunctionArgument* GetFunctionArgument();
+
+    template <typename ...Args>
+    void ReportInfo(std::string str, Token* token, Args... arg)
+    {
+        int lineNum = token ? token->lineNum : _lineNum;
+        int colNum = token ? token->colNum : _colNum;
+
+        str += " (Line " + std::to_string(lineNum) + ", Col: " + std::to_string(colNum) + ")";
+        NC_LOG_MESSAGE(str, arg...);
+    }
+    template <typename ...Args>
+    void ReportWarning(std::string str, Token* token, Args... arg)
+    {
+        int lineNum = token ? token->lineNum : _lineNum;
+        int colNum = token ? token->colNum : _colNum;
+
+        str += " (Line " + std::to_string(lineNum) + ", Col: " + std::to_string(colNum) + ")";
+        NC_LOG_WARNING(str, arg...);
+    }
+    template <typename ...Args>
+    void ReportError(std::string str, Token* token, Args... arg)
+    {
+        int lineNum = token ? token->lineNum : _lineNum;
+        int colNum = token ? token->colNum : _colNum;
+
+        str += " (Line " + std::to_string(lineNum) + ", Col: " + std::to_string(colNum) + ")";
+        NC_LOG_ERROR(str, arg...);
+    }
+    template <typename ...Args>
+    void ReportFatal(std::string str, Token* token, Args... arg)
+    {
+        int lineNum = token ? token->lineNum : _lineNum;
+        int colNum = token ? token->colNum : _colNum;
+
+        str += " (Line " + std::to_string(lineNum) + ", Col: " + std::to_string(colNum) + ")";
+        NC_LOG_FATAL(str, arg...);
+    }
+    template <typename ...Args>
+    void ReportSuccess(std::string str, Token* token, Args... arg)
+    {
+        int lineNum = token ? token->lineNum : _lineNum;
+        int colNum = token ? token->colNum : _colNum;
+
+        str += " (Line " + std::to_string(lineNum) + ", Col: " + std::to_string(colNum) + ")";
+        NC_LOG_SUCCESS(str, arg...);
+    }
+    template <typename ...Args>
+    void ReportDeprecated(std::string str, Token* token, Args... arg)
+    {
+        int lineNum = token ? token->lineNum : _lineNum;
+        int colNum = token ? token->colNum : _colNum;
+
+        str += " (Line " + std::to_string(lineNum) + ", Col: " + std::to_string(colNum) + ")";
+        NC_LOG_DEPRECATED(str, arg...);
+    }
+
 private:
-    inline const Token* _GetToken(size_t index)
+    inline bool _GetToken(size_t index, Token** out)
     {
-        if (index >= _lexerFile.tokens.size())
-            return nullptr;
+        ZoneScopedNC("_GetToken", tracy::Color::Green3)
 
-        return &_lexerFile.tokens[index];
+        if (index >= _tokensNum)
+            return false;
+
+        Token& token = _tokens[index];
+
+        _lineNum = token.lineNum;
+        _colNum = token.colNum;
+        *out = &token;
+
+        return true;
     }
 
-    LexerFile& _lexerFile;
+    std::vector<ASTFunctionDecl*> _functionNodes;
+    std::vector<Token>& _tokens;
+    size_t _tokensNum = 0;
+    size_t _tokenIndex = 0;
 
-    std::stack<TokenType> _stack;
-    size_t _parseIndex = 0;
+    int _lineNum = 1;
+    int _colNum = 1;
 };
 
-
-struct ASTNode;
-struct ASTFunctionDecl;
-struct ASTFunctionCall;
-struct ASTStruct;
-struct ASTEnum;
-struct ASTVariable;
 class Parser
 {
 public:
-    void Init();
-    void Process(ModuleParser& file);
+    Parser();
 
-private:
-    bool CheckSyntax(ModuleParser& file);
+    bool Run(ModuleInfo& moduleInfo);
+    bool RunSemanticCheck(ModuleInfo& moduleInfo);
 
-    void BuildAST(ModuleParser& file);
+    // Syntax Analysis & AST Building
+    bool ParseFunction(ModuleInfo& moduleInfo);
+    bool ParseFunctionParameterList(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl);
+    bool ParseFunctionReturnType(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl);
+    bool ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl);
+    bool ParseFunctionCall(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTFunctionCall* out);
+    bool ParseExpression(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTExpression* out);
+    bool ParseIfStatement(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out);
+    bool ParseIfStatementCondition(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out);
+    bool ParseIfStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out);
+    bool ParseIfStatementSequence(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out);
 
-    ASTFunctionDecl* ParseFunction(ModuleParser& parser);
-    ASTFunctionCall* ParseFunctionCall(ModuleParser& parser);
-    ASTStruct* ParseStruct(ModuleParser& parser);
-    ASTEnum* ParseEnum(ModuleParser& parser);
-    ASTVariable* ParseVariable(ModuleParser& parser);
+    // Semantics
+    bool CheckFunctionParameters(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl);
+    bool CheckFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl);
 
-    ASTNode* ParseExpression(ModuleParser& parser);
+    bool GetTypeFromExpression(ModuleInfo& moduleInfo, NaiType& outType, ASTExpression* expression);
+    NaiType GetTypeFromLiteral(uint64_t value);
+    NaiType GetTypeFromVariable(ASTVariable* variable);
+    NaiType GetTypeFromFunctionCall(ModuleInfo& moduleInfo, ASTFunctionCall* fnCall);
 
-    ASTNode* ParseKeywordWhile(ModuleParser& parser);
-    ASTNode* ParseKeywordIf(ModuleParser& parser);
-    ASTNode* ParseKeywordFor(ModuleParser& parser);
-    ASTNode* ParseKeywordReturn(ModuleParser& parser);
-
-    void VisitAST(const std::vector<ASTNode*>& ast);
-    void VisitNode(const ASTNode* node);
-
-    template<typename... Args>
-    void ReportError(int errorCode, std::string str, Args... args)
+    // Utils
+    inline NaiType GetTypeFromChar(const char* str, int size)
     {
-        std::stringstream ss;
-        ss << "Parsing Error 2" << errorCode << ": " << str;
+        ZoneScopedNC("GetTypeFromChar", tracy::Color::Purple)
 
-        printf_s(ss.str().c_str(), args...);
+        size_t hashedStr = StringUtils::hash_djb2(str, size);
+
+        const auto itr = _typeNameHashToNaiType.find(hashedStr);
+        if (itr == _typeNameHashToNaiType.end())
+            return NaiType::CUSTOM;
+
+        return itr->second;
     }
-
-    robin_hood::unordered_map<TokenType, robin_hood::unordered_map<TokenType, int>> _rules;
-
-    std::string defaultReturnTypeName = "void";
-    std::string inferTypeName = "auto";
-    Token* defaultReturnTypeToken = new Token();
-    Token* inferTypeToken = new Token();
+private:
+    robin_hood::unordered_map<uint32_t, NaiType> _typeNameHashToNaiType;
 };

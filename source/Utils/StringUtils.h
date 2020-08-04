@@ -36,6 +36,7 @@ namespace StringUtils
 
     inline uint64_t ToUInt64(const char* value, int size) 
     {
+        // TODO: Modify this to return a bool to indicate if value is within UInt64 scope
         uint64_t result = 0;
 
         char const* p = value;
@@ -44,6 +45,19 @@ namespace StringUtils
             result = (result << 1) + (result << 3) + *(p++) - '0';
         }
         return result;
+    }
+
+    constexpr size_t hash_djb2(const char* str, int size)
+    {
+        size_t hash = 5381;
+
+        for (int i = 0; i < size; i++)
+        {
+            int c = str[i];
+            hash = ((hash << 5) + hash) ^ c;
+        }
+
+        return hash;
     }
 
     // FNV-1a 32bit hashing algorithm.
@@ -56,4 +70,8 @@ namespace StringUtils
 constexpr unsigned int operator"" _h(char const* s, std::size_t count)
 {
     return StringUtils::fnv1a_32(s, count);
+}
+constexpr unsigned int operator"" _djb2(char const* s, std::size_t count)
+{
+    return StringUtils::hash_djb2(s, count);
 }

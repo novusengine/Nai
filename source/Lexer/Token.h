@@ -31,28 +31,7 @@ enum class TokenType
     DATATYPE,
     KEYWORD,
     OPERATOR,
-    NONE = 999,
-
-    // Non Terminal Symbols
-    NTS_START,
-    NTS_BODY,
-    NTS_DECLARATION,
-    NTS_DECLARATION_TERMINATOR,
-    NTS_VALUE,
-    NTS_EXPRESSION,
-    NTS_EXPRESSION_RECURSIVE,
-    NTS_EXPRESSION_SEQUENCE,
-    NTS_ARGUMENT_LIST,
-    NTS_ARGUMENT_DECLARATION,
-    NTS_ARGUMENT_DECLARATION_SEQUENCE,
-    NTS_ARGUMENT_TERMINATOR,
-    NTS_PARAMETER_LIST,
-    NTS_PARAMETER_TERMINATOR,
-    NTS_STRUCT_MEMBER,
-    NTS_ENUM_MEMBER,
-    NTS_ENUM_TERMINATOR,
-    NTS_IF_TERMINATOR,
-    NTS_RETURN_TYPE
+    NONE = 999
 };
 
 enum class TokenSubType
@@ -62,6 +41,9 @@ enum class TokenSubType
     KEYWORD_FUNCTION,
     KEYWORD_STRUCT,
     KEYWORD_ENUM,
+    KEYWORD_BREAK,
+    KEYWORD_CONTINUE,
+    KEYWORD_RETURN,
     KEYWORD_WHILE,
     KEYWORD_IF,
     KEYWORD_ELSEIF,
@@ -69,9 +51,6 @@ enum class TokenSubType
     KEYWORD_FOR,
     KEYWORD_TRUE,
     KEYWORD_FALSE,
-    KEYWORD_BREAK,
-    KEYWORD_CONTINUE,
-    KEYWORD_RETURN,
     DECLARATION_ASSIGN,
     CONST_DECLARATION,
     CONST_DECLARATION_ASSIGN,
@@ -126,13 +105,25 @@ public:
             subType <= TokenSubType::OP_BITWISE_SHIFT_LEFT)
             return true;
 
-        if (type == TokenType::OP_ASSIGN && subType == TokenSubType::NONE)
+        if (type == TokenType::OP_ASSIGN && 
+            subType == TokenSubType::NONE)
             return false;
 
         if (type >= TokenType::OP_NOT &&
             type <= TokenType::OP_BITWISE_OR)
             return true;
 
+        return false;
+    }
+    bool IsAssignOperator() const
+    {
+        if (type == TokenType::OP_ASSIGN)
+            return true;
+
+        if (subType >= TokenSubType::OP_ADD_ASSIGN && 
+            subType <= TokenSubType::OP_BITWISE_OR_ASSIGN)
+            return true;
+    
         return false;
     }
 

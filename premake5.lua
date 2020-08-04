@@ -66,5 +66,3 @@ project (PROJECT_NAME)
         optimize "On"
         toolset "msc-ClangCL"
         targetdir "bin/ReleaseClang"
-
-dofile("samples/unittests/premake5.lua")

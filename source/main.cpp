@@ -4,8 +4,6 @@
 
 #include "Lexer/Lexer.h"
 #include "Parser/Parser.h"
-#include "ByteCode/BCGenerator.h"
-#include "ByteCode/BCVM.h"
 
 #include "UnitTester/UnitTester.h"
 #include "Utils/CLIParser.h"
@@ -27,13 +25,12 @@ void operator delete(void* ptr) noexcept
 
 int Compile(const std::string& fileName)
 {
-    ZoneScoped;
+    ZoneScopedNC("Compile", tracy::Color::Red)
 
     Lexer lexer;
     lexer.Init();
 
     Parser parser;
-    parser.Init();
 
     FILE* file = nullptr;
     fopen_s(&file, fileName.c_str(), "r");
@@ -61,20 +58,14 @@ int Compile(const std::string& fileName)
                 // Time Parsing
                 t1 = std::chrono::high_resolution_clock::now();
 
-                ModuleParser parserFile(lexerFile);
-                parser.Process(parserFile);
+                ModuleInfo parserFile(lexerFile);
+                parser.Run(parserFile);
 
                 t2 = std::chrono::high_resolution_clock::now();
                 time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
                 std::cout << "Parsing took " << time_span.count() << " seconds.\n";
 
                 std::cout << std::endl;
-
-                BCGenerator bcGenerator(parserFile);
-                bcGenerator.Generate();
-
-                BCVM bcVM(parserFile);
-                bcVM.Run();
 
                 //std::string code = Lexer::UnitTest_TokensToCode(lexerFile.GetTokens());
             }
