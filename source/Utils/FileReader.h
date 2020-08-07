@@ -5,10 +5,14 @@
 class FileReader
 {
 public:
-    FileReader(std::string path, std::string fileName) : _path(path), _fileName(fileName) {}
+    FileReader(std::string path, std::string fileName) : _path(path), _fileName(fileName) 
+    {
+        ZoneScoped;
+    }
 
     bool Fetch()
     {
+        ZoneScoped;
         fopen_s(&_fileStream, _path.c_str(), "r");
 
         fseek(_fileStream, 0, SEEK_END);

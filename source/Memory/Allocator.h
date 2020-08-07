@@ -61,8 +61,8 @@ namespace Memory
 
             _blockNum += 1;
 
-            size_t blockSize = sizeof(uint8_t) * _blockSize;
-            void* blockData = malloc(blockSize);
+            size_t blockSize = /*sizeof(uint8_t) * */_blockSize;
+            void* blockData = new uint8_t[blockSize];
             if (!blockData)
             {
                 printf("Failed to allocate %zu bytes in AddBlock\n", blockSize);
