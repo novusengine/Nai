@@ -28,25 +28,29 @@ BytecodeVM::~BytecodeVM()
 
 bool BytecodeVM::RunScript(fs::path filePath)
 {
+    ZoneScoped;
+
     if (!fs::exists(filePath))
     {
         NC_LOG_ERROR("RunScript: Attempt to run script using non-existing path (%s)", filePath.string().c_str());
         return false;
     }
 
-    std::vector<ByteInstruction*>* instructions = nullptr;
-    if (!Compile(filePath, &instructions))
+    ASTFunctionDecl* fnDecl = nullptr;
+    if (!Compile(filePath, fnDecl))
         return false;
 
-    if (!Run(instructions))
+    if (!Run(fnDecl))
         return false;
 
     NC_LOG_SUCCESS("RunScript: Loaded (%s) successfully", filePath.filename().string().c_str());
     return true;
 }
 
-bool BytecodeVM::Compile(fs::path& filePath, std::vector<ByteInstruction*>** output)
+bool BytecodeVM::Compile(fs::path& filePath, ASTFunctionDecl*& mainFnDecl)
 {
+    ZoneScoped;
+
     std::string filePathStr = filePath.string();
 
     FileReader reader(filePathStr, filePath.filename().string());
@@ -56,8 +60,6 @@ bool BytecodeVM::Compile(fs::path& filePath, std::vector<ByteInstruction*>** out
         return false;
     }
 
-    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-
     LexerFile lexerFile(reader.GetBuffer(), reader.Length());
     if (!_lexer.Process(lexerFile))
         return false;
@@ -65,10 +67,6 @@ bool BytecodeVM::Compile(fs::path& filePath, std::vector<ByteInstruction*>** out
     ModuleInfo& moduleInfo = _modules.emplace_back(lexerFile);
     if (!_parser.Run(moduleInfo))
         return false;
-
-    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-    NC_LOG_SUCCESS("RunScript: Compiler Frontend Finished in %f seconds", time_span.count());
 
     size_t mainFnNameHash = StringUtils::hash_djb2("main", 4);
     ASTFunctionDecl* fnDecl = moduleInfo.GetFunctionByNameHash(mainFnNameHash);
@@ -78,31 +76,23 @@ bool BytecodeVM::Compile(fs::path& filePath, std::vector<ByteInstruction*>** out
         return false;
     }
 
-    t1 = std::chrono::high_resolution_clock::now();
-
     if (!_bytecodeGenerater.Run(moduleInfo))
         return false;
 
-    t2 = std::chrono::high_resolution_clock::now();
-    time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-    NC_LOG_SUCCESS("RunScript: Compiler Backend Finished in %f seconds", time_span.count());
-
-    *output = &fnDecl->GetInstructions();
-
+    mainFnDecl = fnDecl;
     return true;
 }
 
-bool BytecodeVM::Run(std::vector<ByteInstruction*>* instructions)
+bool BytecodeVM::Run(ASTFunctionDecl* fnDecl)
 {
-    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+    ZoneScoped;
     BytecodeContext& context = GetContext();
 
-    if (!context.RunInstructions(instructions))
+    if (!context.Prepare())
         return false;
 
-    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-    NC_LOG_SUCCESS("RunScript: Script Executed in %f seconds", time_span.count());
+    if (!context.RunInstructions(fnDecl->GetInstructions()))
+        return false;
 
     return true;
 }

@@ -15,7 +15,9 @@ enum class ASTNodeType : unsigned char
     VALUE,
     VARIABLE,
     DATATYPE,
+    WHILE_STATEMENT,
     IF_STATEMENT,
+    JMP_STATEMENT,
     RETURN_STATEMENT,
     FUNCTION_DECL,
     FUNCTION_PARAMETER,
@@ -53,6 +55,12 @@ enum class IFStatementType : unsigned char
     IF,
     ELSEIF,
     ELSE
+};
+enum class JMPStatementType : unsigned char
+{
+    NONE,
+    CONTINUE,
+    BREAK
 };
 
 #pragma pack(push, 1)
@@ -303,6 +311,13 @@ struct ASTVariable : public ASTValue
     ASTExpression* expression = nullptr;
 };
 
+struct ASTWhileStatement : public ASTNode
+{
+    ASTWhileStatement() : ASTNode(ASTNodeType::WHILE_STATEMENT) { }
+
+    ASTExpression* condition = nullptr;
+    ASTSequence* body = nullptr;
+};
 struct ASTIfStatement : public ASTNode
 {
     ASTIfStatement() : ASTNode(ASTNodeType::IF_STATEMENT) { }
@@ -311,7 +326,13 @@ struct ASTIfStatement : public ASTNode
     ASTSequence* body = nullptr;
     ASTIfStatement* next = nullptr;
 
-    IFStatementType type = IFStatementType::NONE;
+    IFStatementType ifType = IFStatementType::NONE;
+};
+struct ASTJmpStatement : public ASTNode
+{
+    ASTJmpStatement() : ASTNode(ASTNodeType::JMP_STATEMENT) { }
+
+    JMPStatementType jmpType = JMPStatementType::NONE;
 };
 struct ASTReturnStatement : public ASTNode
 {

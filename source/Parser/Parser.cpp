@@ -30,10 +30,20 @@ ASTDataType* ModuleInfo::GetDataType()
     ZoneScopedNC("ModuleInfo::GetDataType", tracy::Color::Aquamarine2)
     return allocator.New<ASTDataType>();
 }
+ASTWhileStatement* ModuleInfo::GetWhileStatement()
+{
+    ZoneScopedNC("ModuleInfo::GetWhileStatement", tracy::Color::Aquamarine3);
+    return allocator.New<ASTWhileStatement>();
+}
 ASTIfStatement* ModuleInfo::GetIfStatement()
 {
     ZoneScopedNC("ModuleInfo::GetIfStatement", tracy::Color::Aquamarine3)
     return allocator.New<ASTIfStatement>();
+}
+ASTJmpStatement* ModuleInfo::GetJmpStatement()
+{
+    ZoneScopedNC("ModuleInfo::GetJmpStatement", tracy::Color::Aquamarine3)
+        return allocator.New<ASTJmpStatement>();
 }
 ASTReturnStatement* ModuleInfo::GetReturnStatement()
 {
@@ -522,12 +532,22 @@ bool Parser::ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
                 {
                     ASTIfStatement* ifStmt = moduleInfo.GetIfStatement();
                     ifStmt->UpdateToken(startToken);
-                    ifStmt->type = IFStatementType::IF;
+                    ifStmt->ifType = IFStatementType::IF;
 
                     if (!ParseIfStatement(moduleInfo, fnDecl, ifStmt))
                         return false;
 
                     currentSequence->left = ifStmt;
+                }
+                else if (startToken->subType == TokenSubType::KEYWORD_WHILE)
+                {
+                    ASTWhileStatement* whileStmt = moduleInfo.GetWhileStatement();
+                    whileStmt->UpdateToken(startToken);
+
+                    if (!ParseWhileStatement(moduleInfo, fnDecl, whileStmt))
+                        return false;
+
+                    currentSequence->left = whileStmt;
                 }
                 else if (startToken->subType == TokenSubType::KEYWORD_RETURN)
                 {
@@ -839,14 +859,271 @@ bool Parser::ParseExpression(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, AS
 
     return true;
 }
+bool Parser::ParseWhileStatement(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTWhileStatement* out)
+{
+    ZoneScopedNC("Parser::ParseWhileStatement", tracy::Color::BlueViolet);
+
+    out->body = moduleInfo.GetSequence();
+    out->condition = moduleInfo.GetExpression();
+
+    if (!ParseWhileStatementCondition(moduleInfo, fnDecl, out))
+        return false;
+
+    if (!ParseWhileStatementBody(moduleInfo, fnDecl, out))
+        return false;
+
+    return true;
+}
+bool Parser::ParseWhileStatementCondition(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTWhileStatement* out)
+{
+    ZoneScopedNC("Parser::ParseWhileStatementCondition", tracy::Color::BlueViolet);
+
+    Token* leftParen = nullptr;
+    if (!moduleInfo.EatToken(&leftParen) || leftParen->type != TokenType::LPAREN)
+    {
+        moduleInfo.ReportError("Expected to find opening while parentheses.", nullptr);
+        return false;
+    }
+
+    if (!ParseExpression(moduleInfo, fnDecl, out->condition))
+        return false;
+
+    Token* rightParen = nullptr;
+    if (!moduleInfo.EatToken(&rightParen) || rightParen->type != TokenType::RPAREN)
+    {
+        moduleInfo.ReportError("Expected to find closing while parentheses.", nullptr);
+        return false;
+    }
+
+    return true;
+}
+bool Parser::ParseWhileStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTWhileStatement* out)
+{
+    ZoneScopedNC("Parser::ParseWhileStatementBody", tracy::Color::BlueViolet);
+
+    Token* leftBrace = nullptr;
+    if (!moduleInfo.EatToken(&leftBrace) || leftBrace->type != TokenType::LBRACE)
+    {
+        moduleInfo.ReportError("Expected to find 'opening brace' for while statement(%.*s).", nullptr, out->GetNameSize(), out->GetName());
+        return false;
+    }
+
+    ASTSequence* currentSequence = out->body;
+
+    Token* token = nullptr;
+    if (!moduleInfo.GetToken(&token))
+    {
+        moduleInfo.ReportError("Expected to find 'closing brace' for while statement(%.*s).", nullptr, out->GetNameSize(), out->GetName());
+        return false;
+    }
+
+    if (token->type != TokenType::RBRACE)
+    {
+        ZoneScopedNC("ParseWhileStatementBody::ParseBody", tracy::Color::Red);
+
+        // Parse While Statement Body
+        while (true)
+        {
+            ZoneScopedNC("ParseWhileStatementBody::Iteration", tracy::Color::Red1);
+
+            Token* startToken = nullptr;
+            if (!moduleInfo.EatToken(&startToken) || (startToken->type != TokenType::IDENTIFIER && startToken->type != TokenType::KEYWORD))
+            {
+                moduleInfo.ReportError("Expected to find identifier or keyword.", nullptr);
+                return false;
+            }
+
+            if (startToken->type == TokenType::IDENTIFIER)
+            {
+                ZoneScopedNC("Iteration::Identifier", tracy::Color::Red2);
+
+                if (startToken->subType == TokenSubType::FUNCTION_CALL)
+                {
+                    ZoneScopedNC("Identifier::FunctionCall", tracy::Color::Red3);
+
+                    ASTFunctionCall* fnCall = moduleInfo.GetFunctionCall();
+                    fnCall->UpdateToken(startToken);
+
+                    if (!ParseFunctionCall(moduleInfo, fnDecl, fnCall))
+                        return false;
+
+                    currentSequence->left = fnCall;
+                }
+                else
+                {
+                    ZoneScopedNC("Identifier::Variable", tracy::Color::Red3);
+
+                    ASTVariable* variable = moduleInfo.GetVariable();
+                    moduleInfo.InitVariable(variable, startToken, fnDecl);
+
+                    bool isDeclared = variable->parent;
+
+                    Token* declToken = nullptr;
+                    if (!moduleInfo.EatToken(&declToken) || (declToken->type != TokenType::DECLARATION && !declToken->IsAssignOperator()))
+                    {
+                        moduleInfo.ReportError("Expected to find 'Declaration' or 'Assignment' for Variable(%.*s).", nullptr, startToken->valueSize, startToken->value);
+                        return false;
+                    }
+
+                    if (declToken->type == TokenType::DECLARATION)
+                    {
+                        ZoneScopedNC("Variable::Declaration", tracy::Color::Red4);
+                        if (declToken->subType == TokenSubType::NONE || declToken->subType == TokenSubType::CONST_DECLARATION)
+                        {
+                            ZoneScopedNC("Declaration::NonAssign", tracy::Color::Purple);
+
+                            Token* dataTypeToken = nullptr;
+                            if (!moduleInfo.EatToken(&dataTypeToken) || dataTypeToken->type != TokenType::DATATYPE)
+                            {
+                                moduleInfo.ReportError("Expected to find data type for parameter(%.*s).", nullptr, declToken->valueSize, declToken->value);
+                                return false;
+                            }
+
+                            if (!isDeclared)
+                            {
+                                NaiType type = GetTypeFromChar(dataTypeToken->value, dataTypeToken->valueSize);
+                                variable->dataType->UpdateToken(dataTypeToken);
+                                variable->dataType->SetType(type);
+                            }
+
+                            Token* assignToken = nullptr;
+                            if (!moduleInfo.GetToken(&assignToken) || (assignToken->type != TokenType::OP_ASSIGN && assignToken->type != TokenType::END_OF_LINE))
+                            {
+                                moduleInfo.ReportError("Expected to find 'assignment operator' or 'end of line' for variable(%.*s).", nullptr, variable->GetNameSize(), variable->GetName());
+                                return false;
+                            }
+
+                            if (assignToken->type == TokenType::OP_ASSIGN)
+                            {
+                                // Eat OP_ASSIGN
+                                moduleInfo.EatToken();
+
+                                variable->expression = moduleInfo.GetExpression();
+                                variable->expression->op = ASTOperatorType::ASSIGN;
+                                if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
+                                    return false;
+                            }
+                        }
+                        else if (declToken->subType == TokenSubType::DECLARATION_ASSIGN || declToken->subType == TokenSubType::CONST_DECLARATION_ASSIGN)
+                        {
+                            variable->dataType->SetType(NaiType::AUTO);
+
+                            variable->expression = moduleInfo.GetExpression();
+                            variable->expression->op = ASTOperatorType::ASSIGN;
+                            if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
+                                return false;
+                        }
+                    }
+                    else if (declToken->IsAssignOperator())
+                    {
+                        if (!isDeclared)
+                        {
+                            // Assignment to undeclared variable
+                            moduleInfo.ReportError("Use of undeclared variable(%.*s).", nullptr, startToken->valueSize, startToken->value);
+                            return false;
+                        }
+
+                        variable->expression = moduleInfo.GetExpression();
+                        variable->expression->UpdateOperator(declToken);
+                        if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
+                            return false;
+                    }
+
+                    currentSequence->left = variable;
+                }
+
+                Token* nextToken = nullptr;
+                if (!moduleInfo.EatToken(&nextToken) || nextToken->type != TokenType::END_OF_LINE)
+                {
+                    moduleInfo.ReportError("Expected to find 'End of Line'.", nullptr);
+                    return false;
+                }
+
+            }
+            else if (startToken->type == TokenType::KEYWORD)
+            {
+                // This catches all unallowed keywords (Functions, Structs and Enums)
+                if (startToken->subType < TokenSubType::KEYWORD_BREAK)
+                {
+                    moduleInfo.ReportError("Nested Functions, Structs or Enums are not allowed.", nullptr);
+                    return false;
+                }
+
+                if (startToken->subType == TokenSubType::KEYWORD_ELSEIF)
+                {
+                    moduleInfo.ReportError("Unexpected 'elseif'.", nullptr);
+                    return false;
+                }
+
+                // Parses both 'if & 'elseif'
+                if (startToken->subType == TokenSubType::KEYWORD_IF)
+                {
+                    ASTIfStatement* ifStmt = moduleInfo.GetIfStatement();
+                    if (!ParseIfStatement(moduleInfo, fnDecl, ifStmt))
+                        return false;
+
+                    currentSequence->left = ifStmt;
+                }
+                else if (startToken->subType == TokenSubType::KEYWORD_CONTINUE)
+                {
+                    ASTJmpStatement* jmpStmt = moduleInfo.GetJmpStatement();
+
+                    jmpStmt->UpdateToken(startToken);
+                    jmpStmt->jmpType = JMPStatementType::CONTINUE;
+
+                    currentSequence->left = jmpStmt;
+
+                    if (!moduleInfo.EatToken())
+                    {
+                        moduleInfo.ReportError("Expected to find 'end of line' for continue statement(%.*s)", nullptr, jmpStmt->GetNameSize(), jmpStmt->GetName());
+                        return false;
+                    }
+                }
+                else if (startToken->subType == TokenSubType::KEYWORD_BREAK)
+                {
+                    ASTJmpStatement* jmpStmt = moduleInfo.GetJmpStatement();
+
+                    jmpStmt->UpdateToken(startToken);
+                    jmpStmt->jmpType = JMPStatementType::BREAK;
+
+                    currentSequence->left = jmpStmt;
+
+                    if (!moduleInfo.EatToken())
+                    {
+                        moduleInfo.ReportError("Expected to find 'end of line' for break statement(%.*s)", nullptr, jmpStmt->GetNameSize(), jmpStmt->GetName());
+                        return false;
+                    }
+                }
+            }
+
+            currentSequence->right = moduleInfo.GetSequence();
+            currentSequence = currentSequence->right;
+
+            Token* endToken = nullptr;
+            if (!moduleInfo.GetToken(&endToken))
+            {
+                moduleInfo.ReportError("Expected to find 'closing brace' for while statement(%.*s).", nullptr, out->GetNameSize(), out->GetName());
+                return false;
+            }
+
+            if (endToken->type == TokenType::RBRACE)
+                break;
+        }
+    }
+
+    // Eat RightBrace
+    moduleInfo.EatToken();
+
+    return true;
+}
 bool Parser::ParseIfStatement(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out)
 {
-    ZoneScopedNC("Parser::ParseIfStatement", tracy::Color::BlueViolet)
+    ZoneScopedNC("Parser::ParseIfStatement", tracy::Color::BlueViolet);
 
     out->body = moduleInfo.GetSequence();
 
     // We only Parse a condition if we see an "if" or "elseif"
-    if (out->type != IFStatementType::ELSE)
+    if (out->ifType != IFStatementType::ELSE)
     {
         out->condition = moduleInfo.GetExpression();
 
@@ -864,7 +1141,7 @@ bool Parser::ParseIfStatement(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, A
 }
 bool Parser::ParseIfStatementCondition(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out)
 {
-    ZoneScopedNC("Parser::ParseIfStatementCondition", tracy::Color::BlueViolet)
+    ZoneScopedNC("Parser::ParseIfStatementCondition", tracy::Color::BlueViolet);
 
     Token* leftParen = nullptr;
     if (!moduleInfo.EatToken(&leftParen) || leftParen->type != TokenType::LPAREN)
@@ -1095,7 +1372,7 @@ bool Parser::ParseIfStatementSequence(ModuleInfo& moduleInfo, ASTFunctionDecl* f
         if (sequenceToken->subType == TokenSubType::KEYWORD_ELSEIF || sequenceToken->subType == TokenSubType::KEYWORD_ELSE)
         {
             // We have already seen an "else", but elseif or else was seen again
-            if (out->type == IFStatementType::ELSE)
+            if (out->ifType == IFStatementType::ELSE)
             {
                 moduleInfo.ReportError("Unexpected 'elseif' or 'else' found where 'else' has already been seen to complete if chain.", nullptr);
                 return false;
@@ -1106,11 +1383,11 @@ bool Parser::ParseIfStatementSequence(ModuleInfo& moduleInfo, ASTFunctionDecl* f
 
             if (sequenceToken->subType == TokenSubType::KEYWORD_ELSEIF)
             {
-                out->next->type = IFStatementType::ELSEIF;
+                out->next->ifType = IFStatementType::ELSEIF;
             }
             else
             {
-                out->next->type = IFStatementType::ELSE;
+                out->next->ifType = IFStatementType::ELSE;
             }
 
             // Eat SequenceToken
@@ -1242,6 +1519,15 @@ bool Parser::CheckFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
 
             type = functionDecl->returnType->GetType();
             typeNode = fnCall;
+
+        }
+        else if (left->type == ASTNodeType::WHILE_STATEMENT)
+        {
+            ASTWhileStatement* whileStmt = static_cast<ASTWhileStatement*>(left);
+
+            // Recurisvely Parse While Statements
+            if (!GetTypeFromExpression(moduleInfo, type, whileStmt->condition))
+                return false;
 
         }
         else if (left->type == ASTNodeType::IF_STATEMENT)

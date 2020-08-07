@@ -14,6 +14,10 @@ enum class ByteOpcode : uint8_t
     SUBTRACT_FROM_REG_TO_REG,   // Register, Register
     MULTIPLY_FROM_REG_TO_REG,   // Register, Register
     DIVIDE_FROM_REG_TO_REG,     // Register, Register
+    COMPARE_TO_REG,             // Val, Register
+    COMPARE_FROM_REG_TO_REG,    // Register, Register
+    JMP,                        // Val
+    JMP_CONDITIONAL,            // Val
     RETURN,                     // VM Keeps track of the instruction pointer
 };
 

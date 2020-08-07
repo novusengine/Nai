@@ -23,73 +23,14 @@ void operator delete(void* ptr) noexcept
     TracyFree(ptr);
     free(ptr);
 }
-
 #endif
 
 int Compile(const std::string& fileName)
 {
-    ZoneScopedNC("Compile", tracy::Color::Red)
+    ZoneScopedNC("Compile", tracy::Color::Red);
 
-        BytecodeVM vm(1, 10);
+    BytecodeVM vm(1, 10);
     vm.RunScript(fileName);
-
-    /*Lexer lexer;
-
-    Parser parser;
-    BytecodeGenerator bytecodeGenerater;
-
-    FILE* file = nullptr;
-    fopen_s(&file, fileName.c_str(), "r");
-    if (file)
-    {
-        fseek(file, 0, SEEK_END);
-        unsigned long size = ftell(file);
-        rewind(file);
-
-        char* buffer = new char[sizeof(char) * size];
-        if (buffer)
-        {
-            size_t readSize = fread(buffer, 1, size, file);
-            if (readSize)
-            {
-                std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-
-                LexerFile lexerFile(buffer, static_cast<long>(readSize));
-                lexer.Process(lexerFile);
-
-                std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
-                std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-                std::cout << "Lexer took " << time_span.count() << " seconds.\n";
-
-                // Time Parsing
-                t1 = std::chrono::high_resolution_clock::now();
-
-                ModuleInfo parserFile(lexerFile);
-                if (!parser.Run(parserFile))
-                    return false;
-
-                t2 = std::chrono::high_resolution_clock::now();
-                time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-                std::cout << "Parsing took " << time_span.count() << " seconds.\n";
-
-                // Time Parsing
-                t1 = std::chrono::high_resolution_clock::now();
-
-                if (!bytecodeGenerater.Run(parserFile))
-                    return false;
-
-                t2 = std::chrono::high_resolution_clock::now();
-                time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
-                std::cout << "Bytecode Generating took " << time_span.count() << " seconds.\n";
-
-                std::cout << std::endl;
-
-                //std::string code = Lexer::UnitTest_TokensToCode(lexerFile.GetTokens());
-            }
-        }
-
-        fclose(file);
-    }*/
 
     return 0;
 }

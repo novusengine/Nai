@@ -102,7 +102,9 @@ struct ModuleInfo
     ASTValue* GetValue();
     ASTVariable* GetVariable();
     ASTDataType* GetDataType();
+    ASTWhileStatement* GetWhileStatement();
     ASTIfStatement* GetIfStatement();
+    ASTJmpStatement* GetJmpStatement();
     ASTReturnStatement* GetReturnStatement();
     ASTFunctionDecl* GetFunctionDecl();
     ASTFunctionParameter* GetFunctionParameter();
@@ -208,6 +210,9 @@ public:
     bool ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl);
     bool ParseFunctionCall(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTFunctionCall* out);
     bool ParseExpression(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTExpression* out);
+    bool ParseWhileStatement(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTWhileStatement* out);
+    bool ParseWhileStatementCondition(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTWhileStatement* out);
+    bool ParseWhileStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTWhileStatement* out);
     bool ParseIfStatement(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out);
     bool ParseIfStatementCondition(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out);
     bool ParseIfStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTIfStatement* out);

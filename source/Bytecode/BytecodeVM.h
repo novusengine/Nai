@@ -34,8 +34,8 @@ public:
     }
 
 private:
-    bool Compile(fs::path& filePath, std::vector<ByteInstruction*>** output);
-    bool Run(std::vector<ByteInstruction*>* instructions);
+    bool Compile(fs::path& filePath, ASTFunctionDecl*& mainFnDecl);
+    bool Run(ASTFunctionDecl* fnDecl);
 
 private:
     uint16_t _contextIndex = 0; // Round Robin when we handle GetContext
