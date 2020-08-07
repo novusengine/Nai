@@ -3,13 +3,14 @@
 #include <string>
 #include <vector>
 #include <cassert>
+#include <atomic>
 #include <robin_hood.h>
 
 #include "Token.h"
 
 struct LexerFile
 {
-    LexerFile(char* inBuffer, long inSize) : buffer(inBuffer), size(inSize), tokens() 
+    LexerFile(char* inBuffer, size_t inSize) : buffer(inBuffer), size(static_cast<long>(inSize)), tokens() 
     {
         // @TODO: Find a "smarter way?" Right now we assume 1 character is 1 token as a minimum
         tokens.reserve(inSize / 2);
@@ -32,8 +33,8 @@ struct LexerFile
 class Lexer
 {
 public:
-    void Init();
-    void Process(LexerFile& file);
+    Lexer();
+    bool Process(LexerFile& file);
 
     inline bool IsAlpha(char c);
     inline bool IsDigit(char c);
@@ -41,16 +42,16 @@ public:
     inline bool CheckDataTypeName(const Token& token);
     inline bool HandleKeyword(Token& token);
 
-    inline void ResolveTokenTypes(LexerFile& file, Token& token);
+    inline bool ResolveTokenTypes(LexerFile& file, Token& token);
     inline void ResolveOperator(LexerFile& file, Token& token);
 
-    inline void SkipComment(LexerFile& file);
-    inline void ResolveMultilineComment(LexerFile& file);
+    inline bool SkipComment(LexerFile& file);
+    inline bool ResolveMultilineComment(LexerFile& file);
     inline long SkipWhitespaceOrNewline(LexerFile& file, long bufferPos = defaultBufferPosition);
     inline long FindNextWhitespaceOrNewline(LexerFile& file, long bufferPos = defaultBufferPosition);
 
-    inline void ExtractTokens(LexerFile& file);
-    inline void ProcessTokens(LexerFile& file);
+    inline bool ExtractTokens(LexerFile& file);
+    inline bool ProcessTokens(LexerFile& file);
 
     template<typename... Args>
     void ReportError(int errorCode, std::string str, Args... args)
@@ -67,7 +68,7 @@ public:
 
 private:
     const static int defaultBufferPosition = -1;
-    int totalLineNum;
+    std::atomic<int> totalLineNum;
 
     robin_hood::unordered_map<char, TokenType> _operatorCharToTypeMap;
 

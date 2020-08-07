@@ -16,6 +16,11 @@ struct ModuleInfo
         _functionNodes.reserve(8);
     }
 
+    inline void SetRegistryCount(uint16_t count)
+    {
+        _registryCount = count;
+    }
+
     inline bool GetToken(Token** out)
     {
         ZoneScopedNC("GetToken", tracy::Color::Green)
@@ -80,7 +85,7 @@ struct ModuleInfo
 
         fnDecl->AddVariable(variable);
     }
-    ASTFunctionDecl* GetFunctionByNameHash(uint32_t nameHash)
+    ASTFunctionDecl* GetFunctionByNameHash(size_t nameHash)
     {
         for (ASTFunctionDecl* fnDecl : _functionNodes)
         {
@@ -103,6 +108,7 @@ struct ModuleInfo
     ASTFunctionParameter* GetFunctionParameter();
     ASTFunctionCall* GetFunctionCall();
     ASTFunctionArgument* GetFunctionArgument();
+    ByteInstruction* GetByteInstruction();
 
     template <typename ...Args>
     void ReportInfo(std::string str, Token* token, Args... arg)
@@ -175,6 +181,8 @@ private:
 
         return true;
     }
+
+    uint16_t _registryCount = 0;
 
     std::vector<ASTFunctionDecl*> _functionNodes;
     std::vector<Token>& _tokens;

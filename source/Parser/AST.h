@@ -5,6 +5,7 @@
 
 #include "../Utils/StringUtils.h"
 #include "../Memory/BlockContainer.h"
+#include "../Bytecode/ByteOpcode.h"
 
 enum class ASTNodeType : unsigned char
 {
@@ -125,7 +126,7 @@ struct ASTExpression : public ASTNode
         {
         case TokenSubType::OP_ADD_ASSIGN:
         {
-            op = ASTOperatorType::ASSIGN;
+            op = ASTOperatorType::ASSIGN_ADD;
             return true;
         }
         case TokenSubType::OP_SUBTRACT_ASSIGN:
@@ -269,6 +270,7 @@ struct ASTValue : public ASTNode
 
     // Numeric Constant Value
     uint64_t value = 0;
+    uint16_t registerIndex = 0;
 
     void UpdateValue()
     {
@@ -282,21 +284,16 @@ struct ASTVariable : public ASTValue
 
     uint64_t& GetValue()
     {
-        if (parent)
-        {
-            return parent->value;
-        }
-
-        return value;
+        return parent ? parent->value : value;
     }
+    uint16_t& GetRegistryIndex()
+    {
+        return parent ? parent->registerIndex : registerIndex;
+    }
+
     ASTDataType* GetDataType()
     {
-        if (parent)
-        {
-            return parent->dataType;
-        }
-
-        return dataType;
+        return parent ? parent->dataType : dataType;
     }
 
     // Originally declared variable
@@ -327,17 +324,24 @@ struct ASTFunctionParameter : public ASTNode
 {
     ASTFunctionParameter() : ASTNode(ASTNodeType::FUNCTION_PARAMETER) { }
 
+    uint16_t registerIndex = 0;
+
     ASTDataType* dataType = nullptr;
     ASTExpression* expression = nullptr;
 };
 struct ASTFunctionDecl : public ASTNode
 {
     ASTFunctionDecl() : ASTNode(ASTNodeType::FUNCTION_DECL) 
-    { 
+    {
+        _byteInstructions.reserve(16);
         _parameters.reserve(16);
         _variables.reserve(16);
     }
 
+    void AddInstruction(ByteInstruction* byteInstruction)
+    {
+        _byteInstructions.push_back(byteInstruction);
+    }
     void AddParameter(ASTFunctionParameter* param)
     {
         _parameters.push_back(param);
@@ -347,6 +351,10 @@ struct ASTFunctionDecl : public ASTNode
         _variables.push_back(var);
     }
 
+    std::vector<ByteInstruction*>& GetInstructions()
+    {
+        return _byteInstructions;
+    }
     std::vector<ASTFunctionParameter*>& GetParameters()
     {
         return _parameters;
@@ -360,6 +368,7 @@ struct ASTFunctionDecl : public ASTNode
     ASTSequence* body = nullptr;
 
 private:
+    std::vector<ByteInstruction*> _byteInstructions;
     std::vector<ASTFunctionParameter*> _parameters;
     std::vector<ASTVariable*> _variables;
 };

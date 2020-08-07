@@ -61,6 +61,12 @@ ASTFunctionArgument* ModuleInfo::GetFunctionArgument()
     return allocator.New<ASTFunctionArgument>();
 }
 
+ByteInstruction* ModuleInfo::GetByteInstruction()
+{
+    ZoneScopedNC("ModuleInfo::GetByteInstruction", tracy::Color::Aquamarine4)
+        return allocator.New<ByteInstruction>();
+}
+
 Parser::Parser()
 {
     // Setup Primitive Types
@@ -156,7 +162,7 @@ bool Parser::RunSemanticCheck(ModuleInfo& moduleInfo)
         }
     }
 
-    return false;
+    return true;
 }
 
 bool Parser::ParseFunction(ModuleInfo& moduleInfo)
@@ -441,6 +447,7 @@ bool Parser::ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
                                 moduleInfo.EatToken();
 
                                 variable->expression = moduleInfo.GetExpression();
+                                variable->expression->op = ASTOperatorType::ASSIGN;
                                 if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                                     return false;
                             }
@@ -450,6 +457,7 @@ bool Parser::ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
                             variable->dataType->SetType(NaiType::AUTO);
 
                             variable->expression = moduleInfo.GetExpression();
+                            variable->expression->op = ASTOperatorType::ASSIGN;
                             if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                                 return false;
                         }
@@ -464,6 +472,13 @@ bool Parser::ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
                         }
 
                         variable->expression = moduleInfo.GetExpression();
+                        if (!variable->expression->UpdateOperator(declToken))
+                        {
+                            // Found unsupported operator
+                            moduleInfo.ReportError("Use of unsupported operator(%.*s).", nullptr, declToken->valueSize, declToken->value);
+                            return false;
+                        }
+
                         if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                             return false;
                     }
@@ -658,13 +673,21 @@ bool Parser::ParseFunctionCall(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, 
                 moduleInfo.EatToken();
 
                 ASTExpression* expression = moduleInfo.GetExpression();
+
+                if (!expression->UpdateOperator(expressionSequenceToken))
+                {
+                    // Found unsupported operator
+                    moduleInfo.ReportError("Use of unsupported operator(%.*s).", nullptr, expressionSequenceToken->valueSize, expressionSequenceToken->value);
+                    return false;
+                }
+
                 expression->left = argument->value;
                 expression->right = moduleInfo.GetExpression();
 
                 argument->value = expression;
                 out->AddArgument(argument);
 
-                if (!ParseExpression(moduleInfo, fnDecl, expression))
+                if (!ParseExpression(moduleInfo, fnDecl, static_cast<ASTExpression*>(expression->right)))
                     return false;
             }
             else
@@ -1139,7 +1162,7 @@ bool Parser::CheckFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
     if (!nextSequence->left)
     {
         moduleInfo.ReportWarning("Found function with no body.", fnDecl->token);
-        return false;;
+        return false;
     }
 
     while (nextSequence)

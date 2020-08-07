@@ -4,9 +4,12 @@
 
 #include "Lexer/Lexer.h"
 #include "Parser/Parser.h"
+#include "Bytecode/BytecodeGenerator.h"
+#include "Bytecode/BytecodeVM.h"
 
 #include "UnitTester/UnitTester.h"
 #include "Utils/CLIParser.h"
+
 
 #ifdef TRACY_ENABLE
 void* operator new(std::size_t count)
@@ -27,10 +30,13 @@ int Compile(const std::string& fileName)
 {
     ZoneScopedNC("Compile", tracy::Color::Red)
 
-    Lexer lexer;
-    lexer.Init();
+        BytecodeVM vm(1, 10);
+    vm.RunScript(fileName);
+
+    /*Lexer lexer;
 
     Parser parser;
+    BytecodeGenerator bytecodeGenerater;
 
     FILE* file = nullptr;
     fopen_s(&file, fileName.c_str(), "r");
@@ -59,11 +65,22 @@ int Compile(const std::string& fileName)
                 t1 = std::chrono::high_resolution_clock::now();
 
                 ModuleInfo parserFile(lexerFile);
-                parser.Run(parserFile);
+                if (!parser.Run(parserFile))
+                    return false;
 
                 t2 = std::chrono::high_resolution_clock::now();
                 time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
                 std::cout << "Parsing took " << time_span.count() << " seconds.\n";
+
+                // Time Parsing
+                t1 = std::chrono::high_resolution_clock::now();
+
+                if (!bytecodeGenerater.Run(parserFile))
+                    return false;
+
+                t2 = std::chrono::high_resolution_clock::now();
+                time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+                std::cout << "Bytecode Generating took " << time_span.count() << " seconds.\n";
 
                 std::cout << std::endl;
 
@@ -72,7 +89,7 @@ int Compile(const std::string& fileName)
         }
 
         fclose(file);
-    }
+    }*/
 
     return 0;
 }

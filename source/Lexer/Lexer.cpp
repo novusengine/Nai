@@ -5,7 +5,7 @@
 #include "Lexer.h"
 #include "Utils/StringUtils.h"
 
-void Lexer::Init()
+Lexer::Lexer()
 {
     ZoneScoped;
 
@@ -34,12 +34,16 @@ void Lexer::Init()
     };
 }
 
-void Lexer::Process(LexerFile& file)
+bool Lexer::Process(LexerFile& file)
 {
     ZoneScoped;
 
-    ProcessTokens(file);
+    if (!ProcessTokens(file))
+        return false;
+
     totalLineNum += file.lineNum;
+
+    return true;
 }
 
 bool Lexer::IsAlpha(char c)
@@ -258,7 +262,7 @@ bool Lexer::HandleKeyword(Token& token)
     return false;
 }
 
-void Lexer::ResolveTokenTypes(LexerFile& file, Token& token)
+bool Lexer::ResolveTokenTypes(LexerFile& file, Token& token)
 {
     ZoneScoped;
 
@@ -281,7 +285,7 @@ void Lexer::ResolveTokenTypes(LexerFile& file, Token& token)
         if (!IsAlpha(tmp) && tmp != '_')
         {
             ReportError(3, "Found identifier with invalid starting character. The following characters are valid: a->z, A->Z and _ (Line: %d, Col: %d)\n", static_cast<int>(file.lineNum), static_cast<int>(file.colNum));
-            assert(false);
+            return false;
         }
 
         if (file.tokens.size() != 0)
@@ -309,11 +313,13 @@ void Lexer::ResolveTokenTypes(LexerFile& file, Token& token)
                 if (!CheckDataTypeName(token))
                 {
                     ReportError(4, "Found DataType with invalid name. A DataType must start with an alphabetical character and may only consist of alphabetical characters & digits (Line: %d, Col: %d)\n", static_cast<int>(file.lineNum), static_cast<int>(file.colNum));
-                    assert(false);
+                    return false;
                 }
             }
         }
     }
+
+    return true;
 }
 void Lexer::ResolveOperator(LexerFile& file, Token& token)
 {
@@ -499,7 +505,7 @@ void Lexer::ResolveOperator(LexerFile& file, Token& token)
         file.colNum += newBufferPos;
 }
 
-void Lexer::SkipComment(LexerFile& file)
+bool Lexer::SkipComment(LexerFile& file)
 {
     ZoneScoped;
 
@@ -533,11 +539,13 @@ void Lexer::SkipComment(LexerFile& file)
         {
             file.colNum += 1;
             file.bufferPosition += 2;
-            ResolveMultilineComment(file);
+            return ResolveMultilineComment(file);
         }
     }
+
+    return true;
 }
-void Lexer::ResolveMultilineComment(LexerFile& file)
+bool Lexer::ResolveMultilineComment(LexerFile& file)
 {
     ZoneScoped;
 
@@ -560,7 +568,8 @@ void Lexer::ResolveMultilineComment(LexerFile& file)
             // Skip the "/*"
             file.colNum += 2;
             file.bufferPosition += 2;
-            ResolveMultilineComment(file);
+            if (!ResolveMultilineComment(file))
+                return false;
         }
         else if (currChar == COMMENT_MULTI_SYMBOL && nextChar == COMMENT_SLASH)
         {
@@ -584,8 +593,10 @@ void Lexer::ResolveMultilineComment(LexerFile& file)
     if (file.size == file.bufferPosition + 1)
     {
         ReportError(2, "Found Multi line comment without closing symbol (Line: %d, Col: %d)\n", static_cast<int>(lineNum), static_cast<int>(colNum));
-        assert(false);
+        return false;
     }
+
+    return true;
 }
 long Lexer::FindNextWhitespaceOrNewline(LexerFile& file, long bufferPos /* = defaultBufferPosition */)
 {
@@ -641,7 +652,7 @@ long Lexer::FindNextWhitespaceOrNewline(LexerFile& file, long bufferPos /* = def
     if (stringError || (stringFound && bufferPos == file.size))
     {
         ReportError(1, "Found string without closing symbol (Line: %d , Col: %d)\n", static_cast<int>(file.lineNum), static_cast<int>(stringColPosition));
-        assert(false);
+        return -1;
     }
 
     return bufferPos;
@@ -675,11 +686,14 @@ long Lexer::SkipWhitespaceOrNewline(LexerFile& file, long bufferPos /* = default
     return bufferPos;
 }
 
-void Lexer::ExtractTokens(LexerFile& file)
+bool Lexer::ExtractTokens(LexerFile& file)
 {
     ZoneScoped;
 
     long endPos = FindNextWhitespaceOrNewline(file);
+    if (endPos == -1)
+        return false;
+
     long lastOperatorIndex = file.bufferPosition;
 
     {
@@ -758,7 +772,9 @@ void Lexer::ExtractTokens(LexerFile& file)
                     token.value = &file.buffer[lastOperatorIndex];
                     token.valueSize = tmpSize;
 
-                    ResolveTokenTypes(file, token);
+                    if (!ResolveTokenTypes(file, token))
+                        return false;
+
                     file.tokens.push_back(token);
 
                     file.colNum += tmpSize;
@@ -805,13 +821,17 @@ void Lexer::ExtractTokens(LexerFile& file)
         token.value = &file.buffer[lastOperatorIndex];
         token.valueSize = tmpSize;
 
-        ResolveTokenTypes(file, token);
+        if (!ResolveTokenTypes(file, token))
+            return false;
+
         file.tokens.push_back(token);
 
         file.colNum += tmpSize;
     }
+
+    return true;
 }
-void Lexer::ProcessTokens(LexerFile& file)
+bool Lexer::ProcessTokens(LexerFile& file)
 {
     ZoneScoped;
 
@@ -824,11 +844,16 @@ void Lexer::ProcessTokens(LexerFile& file)
         {
             file.bufferPosition = SkipWhitespaceOrNewline(file, bufferPos);
             lastBufferPos = file.bufferPosition;
-            SkipComment(file);
+            if (!SkipComment(file))
+                return false;
+
         } while (file.bufferPosition != lastBufferPos);
 
-        ExtractTokens(file);
+        if (!ExtractTokens(file))
+            return false;
     }
+
+    return true;
 }
 
 std::vector<Token> Lexer::UnitTest_CodeToTokens(const std::string /*input*/)
