@@ -128,9 +128,9 @@ struct ASTExpression : public ASTNode
     ASTNode* left = nullptr;
     ASTNode* right = nullptr;
 
-    bool UpdateOperator(const Token* token)
+    bool UpdateOperator(const Token* inToken)
     {
-        switch (token->subType)
+        switch (inToken->subType)
         {
         case TokenSubType::OP_ADD_ASSIGN:
         {
@@ -197,7 +197,7 @@ struct ASTExpression : public ASTNode
             break;
         }
 
-        switch (token->type)
+        switch (inToken->type)
         {
         case TokenType::OP_ASSIGN:
         {

@@ -73,5 +73,5 @@ constexpr unsigned int operator"" _h(char const* s, std::size_t count)
 }
 constexpr unsigned int operator"" _djb2(char const* s, std::size_t count)
 {
-    return StringUtils::hash_djb2(s, count);
+    return static_cast<unsigned int>(StringUtils::hash_djb2(s, static_cast<int>(count)));
 }

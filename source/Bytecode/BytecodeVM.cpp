@@ -60,6 +60,8 @@ bool BytecodeVM::Compile(fs::path& filePath, ASTFunctionDecl*& mainFnDecl)
         return false;
     }
 
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
+
     LexerFile lexerFile(reader.GetBuffer(), reader.Length());
     if (!_lexer.Process(lexerFile))
         return false;
@@ -67,6 +69,10 @@ bool BytecodeVM::Compile(fs::path& filePath, ASTFunctionDecl*& mainFnDecl)
     ModuleInfo& moduleInfo = _modules.emplace_back(lexerFile);
     if (!_parser.Run(moduleInfo))
         return false;
+
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+    NC_LOG_SUCCESS("RunScript: Compiler Frontend Finished in %f seconds", time_span.count());
 
     size_t mainFnNameHash = StringUtils::hash_djb2("main", 4);
     ASTFunctionDecl* fnDecl = moduleInfo.GetFunctionByNameHash(mainFnNameHash);
@@ -76,8 +82,15 @@ bool BytecodeVM::Compile(fs::path& filePath, ASTFunctionDecl*& mainFnDecl)
         return false;
     }
 
+    t1 = std::chrono::high_resolution_clock::now();
+
     if (!_bytecodeGenerater.Run(moduleInfo))
         return false;
+
+    t2 = std::chrono::high_resolution_clock::now();
+    time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+    NC_LOG_SUCCESS("RunScript: Compiler Backend Finished in %f seconds", time_span.count());
+
 
     mainFnDecl = fnDecl;
     return true;
@@ -86,6 +99,7 @@ bool BytecodeVM::Compile(fs::path& filePath, ASTFunctionDecl*& mainFnDecl)
 bool BytecodeVM::Run(ASTFunctionDecl* fnDecl)
 {
     ZoneScoped;
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     BytecodeContext& context = GetContext();
 
     if (!context.Prepare())
@@ -93,6 +107,10 @@ bool BytecodeVM::Run(ASTFunctionDecl* fnDecl)
 
     if (!context.RunInstructions(fnDecl->GetInstructions()))
         return false;
+
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);
+    NC_LOG_SUCCESS("RunScript: Script Executed in %f seconds", time_span.count());
 
     return true;
 }

@@ -234,7 +234,7 @@ public:
 
         size_t hashedStr = StringUtils::hash_djb2(str, size);
 
-        const auto itr = _typeNameHashToNaiType.find(hashedStr);
+        const auto itr = _typeNameHashToNaiType.find(static_cast<uint32_t>(hashedStr));
         if (itr == _typeNameHashToNaiType.end())
             return NaiType::CUSTOM;
 

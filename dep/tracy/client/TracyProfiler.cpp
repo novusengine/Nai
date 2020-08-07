@@ -269,23 +269,23 @@ static const char* GetProcessName()
     return processName;
 }
 
-static uint32_t GetHex( char*& ptr, int skip )
-{
-    uint32_t ret;
-    ptr += skip;
-    char* end;
-    if( ptr[0] == '0' && ptr[1] == 'x' )
-    {
-        ptr += 2;
-        ret = strtol( ptr, &end, 16 );
-    }
-    else
-    {
-        ret = strtol( ptr, &end, 10 );
-    }
-    ptr = end;
-    return ret;
-}
+//static uint32_t GetHex( char*& ptr, int skip )
+//{
+//    uint32_t ret;
+//    ptr += skip;
+//    char* end;
+//    if( ptr[0] == '0' && ptr[1] == 'x' )
+//    {
+//        ptr += 2;
+//        ret = strtol( ptr, &end, 16 );
+//    }
+//    else
+//    {
+//        ret = strtol( ptr, &end, 10 );
+//    }
+//    ptr = end;
+//    return ret;
+//}
 
 static const char* GetHostInfo()
 {
@@ -2583,7 +2583,7 @@ void Profiler::CalibrateDelay()
     int left = Events;
     while( left != 0 )
     {
-        const auto sz = GetQueue().try_dequeue_bulk_single( token, [](const uint64_t&){}, [](QueueItem* item, size_t sz){} );
+        const auto sz = GetQueue().try_dequeue_bulk_single( token, [](const uint64_t&){}, [](QueueItem* /*item*/, size_t /*sz*/){} );
         assert( sz > 0 );
         left -= (int)sz;
     }

@@ -145,9 +145,9 @@ private:
     inline static void PrintColor(std::string message, ColorCode color, Args... args)
     {
 #ifdef _WIN32
-        SetConsoleTextAttribute(_handle, color);
+        SetConsoleTextAttribute(_handle, static_cast<WORD>(color));
         printf(message.c_str(), args...);
-        SetConsoleTextAttribute(_handle, _defaultColor);
+        SetConsoleTextAttribute(_handle, static_cast<WORD>(_defaultColor));
 #else
         const std::string green("\033[1;32m");
         const std::string yellow("\033[1;33m");

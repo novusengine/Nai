@@ -4,7 +4,7 @@
 
 namespace tracy
 {
-
+    /*
 static const char* DecodeArmImplementer( uint32_t v )
 {
     static char buf[16];
@@ -324,5 +324,5 @@ static const char* DecodeIosDevice( const char* id )
     }
     return id;
 }
-
+*/
 }

@@ -123,26 +123,26 @@ bool BytecodeGenerator::Run(ModuleInfo& moduleInfo)
                     {
                         ASTVariable* variable = static_cast<ASTVariable*>(whileLeft);
 
-                        if (ASTExpression* expression = variable->expression)
+                        if (ASTExpression* varExpression = variable->expression)
                         {
                             ByteInstruction* byteInstruction = moduleInfo.GetByteInstruction();
 
                             // I have aligned the ASTOperaterType & ByteOpcode as such that they map 1:1 for ASTNodeType::VALUE, and ASTNodeType::Variable we add + 5
-                            byteInstruction->opcode = static_cast<ByteOpcode>(static_cast<uint8_t>(expression->op) + 5 * (expression->left->type == ASTNodeType::VARIABLE));
+                            byteInstruction->opcode = static_cast<ByteOpcode>(static_cast<uint8_t>(varExpression->op) + 5 * (varExpression->left->type == ASTNodeType::VARIABLE));
 
-                            uint64_t value = 0;
-                            if (expression->left->type == ASTNodeType::VALUE)
+                            uint64_t varValue = 0;
+                            if (varExpression->left->type == ASTNodeType::VALUE)
                             {
-                                ASTValue* val = static_cast<ASTValue*>(expression->left);
-                                value = val->value;
+                                ASTValue* val = static_cast<ASTValue*>(varExpression->left);
+                                varValue = val->value;
                             }
-                            else if (expression->left->type == ASTNodeType::VARIABLE)
+                            else if (varExpression->left->type == ASTNodeType::VARIABLE)
                             {
-                                ASTVariable* val = static_cast<ASTVariable*>(expression->left);
-                                value = val->GetRegistryIndex();
+                                ASTVariable* val = static_cast<ASTVariable*>(varExpression->left);
+                                varValue = val->GetRegistryIndex();
                             }
 
-                            byteInstruction->val1 = value;
+                            byteInstruction->val1 = varValue;
                             byteInstruction->val2 = variable->GetRegistryIndex();
 
                             fnDecl->AddInstruction(byteInstruction);
@@ -155,24 +155,24 @@ bool BytecodeGenerator::Run(ModuleInfo& moduleInfo)
                         if (returnStmt->value)
                         {
                             // Handle Expression (For now we assume we can only return a single literal/variable
-                            ASTExpression* expression = returnStmt->value;
+                            ASTExpression* returnExpression = returnStmt->value;
 
                             ByteInstruction* byteInstruction = moduleInfo.GetByteInstruction();
-                            byteInstruction->opcode = static_cast<ByteOpcode>(static_cast<uint8_t>(ByteOpcode::MOVE_TO_REG) + 5 * (expression->left->type == ASTNodeType::VARIABLE));
+                            byteInstruction->opcode = static_cast<ByteOpcode>(static_cast<uint8_t>(ByteOpcode::MOVE_TO_REG) + 5 * (returnExpression->left->type == ASTNodeType::VARIABLE));
 
-                            uint64_t value = 0;
-                            if (expression->left->type == ASTNodeType::VALUE)
+                            uint64_t returnValue = 0;
+                            if (returnExpression->left->type == ASTNodeType::VALUE)
                             {
-                                ASTValue* val = static_cast<ASTValue*>(expression->left);
-                                value = val->value;
+                                ASTValue* val = static_cast<ASTValue*>(returnExpression->left);
+                                returnValue = val->value;
                             }
-                            else if (expression->left->type == ASTNodeType::VARIABLE)
+                            else if (returnExpression->left->type == ASTNodeType::VARIABLE)
                             {
-                                ASTVariable* val = static_cast<ASTVariable*>(expression->left);
-                                value = val->GetRegistryIndex();
+                                ASTVariable* val = static_cast<ASTVariable*>(returnExpression->left);
+                                returnValue = val->GetRegistryIndex();
                             }
 
-                            byteInstruction->val1 = value;
+                            byteInstruction->val1 = returnValue;
                             byteInstruction->val2 = 0; // Return Values goes into the 0th registry (relative to the function)
                             fnDecl->AddInstruction(byteInstruction);
                         }

@@ -297,7 +297,7 @@ void SysTraceStop()
     CloseTrace( s_traceHandle );
 }
 
-void SysTraceWorker( void* ptr )
+void SysTraceWorker( void* /*ptr*/ )
 {
     SetThreadName( "Tracy SysTrace" );
     ProcessTrace( &s_traceHandle2, 1, 0, 0 );

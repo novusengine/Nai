@@ -1666,8 +1666,6 @@ NaiType Parser::GetTypeFromLiteral(uint64_t value)
     {
         return NaiType::I64;
     }
-
-    return NaiType::INVALID;
 }
 NaiType Parser::GetTypeFromVariable(ASTVariable* variable)
 {
