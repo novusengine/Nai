@@ -57,39 +57,89 @@ public:
                     *GetRegistry(instruction->val2) /= instruction->val1;
                     break;
                 }
-                case ByteOpcode::MOVE_FROM_REG_TO_REG:
-                {
-                    *GetRegistry(instruction->val2) = *GetRegistry(instruction->val1);
-                    break;
-                }
-                case ByteOpcode::ADD_FROM_REG_TO_REG:
-                {
-                    *GetRegistry(instruction->val2) += *GetRegistry(instruction->val1);
-                    break;
-                }
-                case ByteOpcode::SUBTRACT_FROM_REG_TO_REG:
-                {
-                    *GetRegistry(instruction->val2) -= *GetRegistry(instruction->val1);
-                    break;
-                }
-                case ByteOpcode::MULTIPLY_FROM_REG_TO_REG:
-                {
-                    *GetRegistry(instruction->val2) *= *GetRegistry(instruction->val1);
-                    break;
-                }
-                case ByteOpcode::DIVIDE_FROM_REG_TO_REG:
-                {
-                    *GetRegistry(instruction->val2) /= *GetRegistry(instruction->val1);
-                    break;
-                }
                 case ByteOpcode::COMPARE_TO_REG:
                 {
                     _flagRegister = *GetRegistry(instruction->val2) == instruction->val1;
                     break;
                 }
-                case ByteOpcode::COMPARE_FROM_REG_TO_REG:
+                case ByteOpcode::COMPARE_LESS_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) < instruction->val1;
+                    break;
+                }
+                case ByteOpcode::COMPARE_GREATER_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) > instruction->val1;
+                    break;
+                }
+                case ByteOpcode::COMPARE_LESS_EQUAL_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) <= instruction->val1;
+                    break;
+                }
+                case ByteOpcode::COMPARE_GREATER_EQUAL_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) >= instruction->val1;
+                    break;
+                }
+                case ByteOpcode::COMPARE_NOT_EQUAL_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) != instruction->val1;
+                    break;
+                }
+                case ByteOpcode::MOVE_REG_TO_REG:
+                {
+                    *GetRegistry(instruction->val2) = *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::ADD_REG_TO_REG:
+                {
+                    *GetRegistry(instruction->val2) += *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::SUBTRACT_REG_TO_REG:
+                {
+                    *GetRegistry(instruction->val2) -= *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::MULTIPLY_REG_TO_REG:
+                {
+                    *GetRegistry(instruction->val2) *= *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::DIVIDE_REG_TO_REG:
+                {
+                    *GetRegistry(instruction->val2) /= *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::COMPARE_REG_TO_REG:
                 {
                     _flagRegister = *GetRegistry(instruction->val2) == *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::COMPARE_LESS_REG_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) < *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::COMPARE_GREATER_REG_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) > *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::COMPARE_LESS_EQUAL_REG_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) <= *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::COMPARE_GREATER_EQUAL_REG_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) >= *GetRegistry(instruction->val1);
+                    break;
+                }
+                case ByteOpcode::COMPARE_NOT_EQUAL_REG_TO_REG:
+                {
+                    _flagRegister = *GetRegistry(instruction->val2) != *GetRegistry(instruction->val1);
                     break;
                 }
                 case ByteOpcode::JMP:
@@ -99,7 +149,8 @@ public:
                 }
                 case ByteOpcode::JMP_CONDITIONAL:
                 {
-                    if (_flagRegister == 1)
+                    // JMP_CONDITIONAL uses val2 to determine if we should jmp if the last comparison was true/false
+                    if (_flagRegister == instruction->val2)
                     {
                         i = instruction->val1;
                         _flagRegister = 0;

@@ -33,12 +33,12 @@ enum class ASTOperatorType : unsigned char
     ASSIGN_SUBTRACT,
     ASSIGN_MULTIPLY,
     ASSIGN_DIVIDE,
-    ASSIGN_MODULUS,
-    ASSIGN_INCREMENT,
-    ASSIGN_DECREMENT,
+    //ASSIGN_MODULUS,
+    //ASSIGN_INCREMENT,
+    //ASSIGN_DECREMENT,
+    EQUALS,
     LESS,
     GREATER,
-    EQUALS,
     EQUALS_LESS,
     EUQLAS_GREATER,
     EQUALS_NOT,
@@ -152,7 +152,7 @@ struct ASTExpression : public ASTNode
             op = ASTOperatorType::ASSIGN_DIVIDE;
             return true;
         }
-        case TokenSubType::OP_INCREMENT:
+        /*case TokenSubType::OP_INCREMENT:
         {
             op = ASTOperatorType::ASSIGN_INCREMENT;
             return true;
@@ -161,7 +161,7 @@ struct ASTExpression : public ASTNode
         {
             op = ASTOperatorType::ASSIGN_DECREMENT;
             return true;
-        }
+        }*/
         case TokenSubType::OP_EQUALS:
         {
             op = ASTOperatorType::EQUALS;
@@ -224,11 +224,11 @@ struct ASTExpression : public ASTNode
             op = ASTOperatorType::ASSIGN_DIVIDE;
             return true;
         }
-        case TokenType::OP_MODULUS:
+        /*case TokenType::OP_MODULUS:
         {
             op = ASTOperatorType::ASSIGN_MODULUS;
             return true;
-        }
+        }*/
         case TokenType::OP_BITWISE_AND:
         {
             op = ASTOperatorType::BITWISE_AND;

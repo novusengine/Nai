@@ -210,6 +210,8 @@ public:
     bool ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl);
     bool ParseFunctionCall(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTFunctionCall* out);
     bool ParseExpression(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTExpression* out);
+    bool ParseExpressionSequence(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTExpression* out);
+    bool GetExpressionValueFromToken(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, Token* token, ASTNode** out);
     bool ParseWhileStatement(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTWhileStatement* out);
     bool ParseWhileStatementCondition(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTWhileStatement* out);
     bool ParseWhileStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, ASTWhileStatement* out);
