@@ -139,7 +139,7 @@ inline bool Lexer::CheckDataTypeName(const Token& token)
 
     return true;
 }
-bool Lexer::HandleKeyword(Token& token)
+bool Lexer::HandleKeyword(LexerFile& file, Token& token)
 {
     ZoneScoped;
 
@@ -190,7 +190,15 @@ bool Lexer::HandleKeyword(Token& token)
             }
             else if (strncmp(token.value, KEYWORD_ELSE, token.valueSize) == 0)
             {
-                token.subType = TokenSubType::KEYWORD_ELSE;
+                if (strncmp(&file.buffer[file.bufferPosition + 1], KEYWORD_IF, 2) == 0)
+                {
+                    token.subType = TokenSubType::KEYWORD_ELSEIF;
+                    file.bufferPosition += 3; // Offset the bufferPosition for (' ' if)
+                }
+                else
+                {
+                    token.subType = TokenSubType::KEYWORD_ELSE;
+                }
             }
             else
             {
@@ -232,10 +240,6 @@ bool Lexer::HandleKeyword(Token& token)
             {
                 token.subType = TokenSubType::KEYWORD_STRUCT;
             }
-            else if (strncmp(token.value, KEYWORD_ELSEIF, token.valueSize) == 0)
-            {
-                token.subType = TokenSubType::KEYWORD_ELSEIF;
-            }
             else
             {
                 return false;
@@ -266,7 +270,7 @@ bool Lexer::ResolveTokenTypes(LexerFile& file, Token& token)
 {
     ZoneScoped;
 
-    if (HandleKeyword(token))
+    if (HandleKeyword(file, token))
     {
         token.type = TokenType::KEYWORD;
     }

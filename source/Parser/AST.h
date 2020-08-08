@@ -327,6 +327,7 @@ struct ASTIfStatement : public ASTNode
     ASTIfStatement* next = nullptr;
 
     IFStatementType ifType = IFStatementType::NONE;
+    bool isInsideLoop = false; // Defines if the If Statement is inside a loop (for, while... etc)
 };
 struct ASTJmpStatement : public ASTNode
 {

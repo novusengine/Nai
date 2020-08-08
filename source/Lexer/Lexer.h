@@ -40,7 +40,7 @@ public:
     inline bool IsDigit(char c);
     inline bool IsNumeric(const Token& token);
     inline bool CheckDataTypeName(const Token& token);
-    inline bool HandleKeyword(Token& token);
+    inline bool HandleKeyword(LexerFile& file, Token& token);
 
     inline bool ResolveTokenTypes(LexerFile& file, Token& token);
     inline void ResolveOperator(LexerFile& file, Token& token);
@@ -78,7 +78,6 @@ private:
     const char* KEYWORD_ENUM = "enum";
     const char* KEYWORD_WHILE = "while";
     const char* KEYWORD_IF = "if";
-    const char* KEYWORD_ELSEIF = "elseif";
     const char* KEYWORD_ELSE = "else";
     const char* KEYWORD_FOR = "for";
     const char* KEYWORD_TRUE = "true";

@@ -84,7 +84,7 @@ void BytecodeGenerator::Generate_FuncBody(ModuleInfo& moduleInfo, ASTFunctionDec
         else if (left->type == ASTNodeType::IF_STATEMENT)
         {
             ASTIfStatement* ifStmt = static_cast<ASTIfStatement*>(left);
-            Generate_IfStmt(moduleInfo, fnDecl, registerNum, 0, nullptr, ifStmt);
+            Generate_IfStmtChain(moduleInfo, fnDecl, registerNum, 0, nullptr, ifStmt);
         }
         else if (left->type == ASTNodeType::RETURN_STATEMENT)
         {
@@ -187,18 +187,48 @@ void BytecodeGenerator::Generate_ReturnStmt(ModuleInfo& moduleInfo, ASTFunctionD
     returnInstruction->opcode = ByteOpcode::RETURN;
     fnDecl->AddInstruction(returnInstruction);
 }
-void BytecodeGenerator::Generate_IfStmt(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, uint16_t& registerNum, size_t loopStartIndex, std::vector<uint64_t*>* breakJmpPtrs, ASTIfStatement* stmt)
+void BytecodeGenerator::Generate_IfStmtChain(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, uint16_t& registerNum, size_t loopStartIndex, std::vector<uint64_t*>* breakJmpPtrs, ASTIfStatement* stmt)
+{
+    std::vector<ByteInstruction*>& instructions = fnDecl->GetInstructions();
+
+    std::vector<uint64_t*> escapeJmpPtrs;
+    escapeJmpPtrs.reserve(8);
+
+    Generate_IfStmt(moduleInfo, fnDecl, registerNum, &escapeJmpPtrs, loopStartIndex, breakJmpPtrs, stmt);
+
+    // Set the Instruction Index for Escape Jmp
+    size_t ifChainEndIndex = instructions.size();
+
+    // Set the Break Instruction Index for where to jump
+    for (uint64_t* index : escapeJmpPtrs)
+    {
+        *index = ifChainEndIndex;
+    }
+}
+void BytecodeGenerator::Generate_IfStmt(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, uint16_t& registerNum, std::vector<uint64_t*>* escapeJmpPtrs, size_t loopStartIndex, std::vector<uint64_t*>* breakJmpPtrs, ASTIfStatement* stmt)
 {
     uint64_t* instructionPtr = nullptr;
 
-    // Parse If Condition
-    Generate_IfHead(moduleInfo, fnDecl, registerNum, &instructionPtr, stmt->condition);
+    if (stmt->ifType != IFStatementType::ELSE)
+    {
+        // Parse If Condition
+        Generate_IfHead(moduleInfo, fnDecl, registerNum, &instructionPtr, stmt->condition);
+    }
 
     // Parse If Body
-    Generate_IfBody(moduleInfo, fnDecl, registerNum, loopStartIndex, breakJmpPtrs, stmt->body);
+    Generate_IfBody(moduleInfo, fnDecl, registerNum, escapeJmpPtrs, loopStartIndex, breakJmpPtrs, stmt);
 
-    // Set the Instruction Index for where to jump if condition is false
-    *instructionPtr = fnDecl->GetInstructions().size();
+    if (stmt->ifType != IFStatementType::ELSE)
+    {
+        // Set the Instruction Index for where to jump if condition is false (This will automatically align with the next statement if one exists
+        *instructionPtr = fnDecl->GetInstructions().size();
+    }
+    
+    // This will never be true if "stmt->type == IFStatementType::ELSE" because the parser prevents the else from having a "->next"
+    if (stmt->next)
+    {
+        Generate_IfStmt(moduleInfo, fnDecl, registerNum, escapeJmpPtrs, loopStartIndex, breakJmpPtrs, stmt->next);
+    }
 }
 void BytecodeGenerator::Generate_IfHead(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, uint16_t& registerNum, uint64_t** nextInstructionIndex, ASTExpression* expression)
 {
@@ -212,9 +242,9 @@ void BytecodeGenerator::Generate_IfHead(ModuleInfo& moduleInfo, ASTFunctionDecl*
 
     *nextInstructionIndex = &jmpToEndConditionalInstruction->val1;
 }
-void BytecodeGenerator::Generate_IfBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, uint16_t& registerNum, size_t loopStartIndex, std::vector<uint64_t*>* breakJmpPtrs, ASTSequence* body)
+void BytecodeGenerator::Generate_IfBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, uint16_t& registerNum, std::vector<uint64_t*>* escapeJmpPtrs, size_t loopStartIndex, std::vector<uint64_t*>* breakJmpPtrs, ASTIfStatement* stmt)
 {
-    ASTSequence* nextSequence = body;
+    ASTSequence* nextSequence = stmt->body;
     while (nextSequence->left)
     {
         ASTNode* left = nextSequence->left;
@@ -227,7 +257,7 @@ void BytecodeGenerator::Generate_IfBody(ModuleInfo& moduleInfo, ASTFunctionDecl*
         else if (left->type == ASTNodeType::IF_STATEMENT)
         {
             ASTIfStatement* ifStmt = static_cast<ASTIfStatement*>(left);
-            Generate_IfStmt(moduleInfo, fnDecl, registerNum, loopStartIndex, breakJmpPtrs, ifStmt);
+            Generate_IfStmtChain(moduleInfo, fnDecl, registerNum, loopStartIndex, breakJmpPtrs, ifStmt);
         }
         else if (left->type == ASTNodeType::RETURN_STATEMENT)
         {
@@ -257,6 +287,17 @@ void BytecodeGenerator::Generate_IfBody(ModuleInfo& moduleInfo, ASTFunctionDecl*
         }
 
         nextSequence = nextSequence->right;
+    }
+
+    // Place Escape Jump for If Statement
+    if (stmt->next)
+    {
+        ByteInstruction* escapeJmpInstruction = moduleInfo.GetByteInstruction();
+        escapeJmpInstruction->opcode = ByteOpcode::JMP;
+        escapeJmpInstruction->val1 = 0; // This is set later
+        fnDecl->AddInstruction(escapeJmpInstruction);
+
+        escapeJmpPtrs->push_back(&escapeJmpInstruction->val1);
     }
 }
 void BytecodeGenerator::Generate_WhileStmt(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, uint16_t& registerNum, ASTWhileStatement* stmt)
@@ -311,7 +352,7 @@ void BytecodeGenerator::Generate_LoopBody(ModuleInfo& moduleInfo, ASTFunctionDec
         else if (left->type == ASTNodeType::IF_STATEMENT)
         {
             ASTIfStatement* ifStmt = static_cast<ASTIfStatement*>(left);
-            Generate_IfStmt(moduleInfo, fnDecl, registerNum, loopStartIndex, &breakJmpPtrs, ifStmt);
+            Generate_IfStmtChain(moduleInfo, fnDecl, registerNum, loopStartIndex, &breakJmpPtrs, ifStmt);
         }
         else if (left->type == ASTNodeType::RETURN_STATEMENT)
         {

@@ -509,6 +509,7 @@ bool Parser::ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
                 // This catches all unallowed keywords (Functions, Structs, Enums, Breaks and Continues)
                 if (startToken->subType <= TokenSubType::KEYWORD_CONTINUE)
                 {
+                    // This will catch continue/else, while the else statement will catch Function Decl, Struct Decl and Enum Decl.
                     if (startToken->subType >= TokenSubType::KEYWORD_BREAK)
                     {
                         moduleInfo.ReportError("Continue/Break is not allowed outside of a 'for' or 'while' loop.", nullptr);
@@ -1131,6 +1132,8 @@ bool Parser::ParseWhileStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fn
                 if (startToken->subType == TokenSubType::KEYWORD_IF)
                 {
                     ASTIfStatement* ifStmt = moduleInfo.GetIfStatement();
+                    ifStmt->isInsideLoop = true;
+
                     if (!ParseIfStatement(moduleInfo, fnDecl, ifStmt))
                         return false;
 
@@ -1391,12 +1394,31 @@ bool Parser::ParseIfStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDec
             }
             else if (startToken->type == TokenType::KEYWORD)
             {
-                // TODO: We need to both support "NOT ALLOWING" "Break/Continue" when out of a loop, but also "ALLOWING" it when inside of a loop
                 // This catches all unallowed keywords (Functions, Structs and Enums)
-                if (startToken->subType < TokenSubType::KEYWORD_BREAK)
+                if (out->isInsideLoop)
                 {
-                    moduleInfo.ReportError("Nested Functions, Structs or Enums are not allowed.", nullptr);
-                    return false;
+                    if (startToken->subType < TokenSubType::KEYWORD_BREAK)
+                    {
+                        moduleInfo.ReportError("Nested Functions, Structs or Enums are not allowed.", nullptr);
+                        return false;
+                    }
+                }
+                else
+                {
+                    if (startToken->subType <= TokenSubType::KEYWORD_CONTINUE)
+                    {
+                        // This will catch continue/else, while the else statement will catch Function Decl, Struct Decl and Enum Decl.
+                        if (startToken->subType >= TokenSubType::KEYWORD_BREAK)
+                        {
+                            moduleInfo.ReportError("Continue/Break is not allowed outside of a 'for' or 'while' loop.", nullptr);
+                            return false;
+                        }
+                        else
+                        {
+                            moduleInfo.ReportError("Nested Functions, Structs or Enums are not allowed.", nullptr);
+                            return false;
+                        }
+                    }
                 }
 
                 if (startToken->subType == TokenSubType::KEYWORD_ELSEIF)
