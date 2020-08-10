@@ -12,7 +12,7 @@ enum class ASTNodeType : unsigned char
     NONE,
     SEQUENCE,
     EXPRESSION,
-    VALUE,
+    VALUE, // TODO: We no longer need VALUE, fix this !!!
     VARIABLE,
     DATATYPE,
     WHILE_STATEMENT,
@@ -342,15 +342,6 @@ struct ASTReturnStatement : public ASTNode
     ASTExpression* value = nullptr;
 };
 
-struct ASTFunctionParameter : public ASTNode
-{
-    ASTFunctionParameter() : ASTNode(ASTNodeType::FUNCTION_PARAMETER) { }
-
-    uint16_t registerIndex = 0;
-
-    ASTDataType* dataType = nullptr;
-    ASTExpression* expression = nullptr;
-};
 struct ASTFunctionDecl : public ASTNode
 {
     ASTFunctionDecl() : ASTNode(ASTNodeType::FUNCTION_DECL) 
@@ -364,7 +355,7 @@ struct ASTFunctionDecl : public ASTNode
     {
         _byteInstructions.push_back(byteInstruction);
     }
-    void AddParameter(ASTFunctionParameter* param)
+    void AddParameter(ASTVariable* param)
     {
         _parameters.push_back(param);
     }
@@ -377,7 +368,7 @@ struct ASTFunctionDecl : public ASTNode
     {
         return _byteInstructions;
     }
-    std::vector<ASTFunctionParameter*>& GetParameters()
+    std::vector<ASTVariable*>& GetParameters()
     {
         return _parameters;
     }
@@ -386,12 +377,21 @@ struct ASTFunctionDecl : public ASTNode
         return _variables;
     }
 
+    uint16_t GetRegisterIndex()
+    {
+        registerNum += 1 * (registerOffset == registerNum);
+        return registerOffset++;
+    }
+
     ASTDataType* returnType = nullptr;
     ASTSequence* body = nullptr;
 
+    uint16_t registerNum = 0;
+    uint16_t registerOffset = 0;
+
 private:
     std::vector<ByteInstruction*> _byteInstructions;
-    std::vector<ASTFunctionParameter*> _parameters;
+    std::vector<ASTVariable*> _parameters;
     std::vector<ASTVariable*> _variables;
 };
 struct ASTFunctionArgument : public ASTNode

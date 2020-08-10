@@ -23,6 +23,7 @@
 #endif
 
 #define NOMINMAX
+constexpr unsigned int NAI_BYTECODE_STACK_SIZE = 1000000; // 1 MB
 
 #include <Tracy.hpp>
 #include <cstddef>

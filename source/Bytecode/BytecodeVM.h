@@ -3,6 +3,7 @@
 #include <mutex>
 #include <vector>
 #include <filesystem>
+#include <Utils/FileReader.h>
 
 #include "../Lexer/Lexer.h"
 #include "../Parser/Parser.h"
@@ -11,10 +12,28 @@
 
 namespace fs = std::filesystem;
 
+class BytecodeVM;
+struct VMFunctionCall
+{
+public:
+    bool Parse(BytecodeVM* vm, std::string signature, void* inCallback);
+
+public:
+    std::string_view name;
+
+    NaiType returnData;
+    std::vector<NaiType> arguments;
+    
+    void* callback = nullptr;
+
+private:
+    LexerFile _lexerFile;
+};
+
 class BytecodeVM
 {
 public:
-    BytecodeVM(uint16_t contextNum, uint16_t registryCount);
+    BytecodeVM(uint32_t contextNum);
     ~BytecodeVM();
 
     bool RunScript(fs::path path);
@@ -34,9 +53,11 @@ public:
     }
 
 private:
-    bool Compile(fs::path& filePath, ASTFunctionDecl*& mainFnDecl);
-    bool Run(ASTFunctionDecl* fnDecl);
+    bool Compile(FileReader& reader, ModuleInfo& moduleInfo);
+    bool Run(ModuleInfo& moduleInfo, size_t fnNameHash);
 
+    friend struct VMFunctionCall;
+    Lexer& GetLexer() { return _lexer; }
 private:
     uint16_t _contextIndex = 0; // Round Robin when we handle GetContext
     std::mutex _contextMutex;

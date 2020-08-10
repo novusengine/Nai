@@ -5,12 +5,13 @@
 struct BytecodeContext
 {
 public:
-    void Init(uint16_t registryCount)
+    void Init(uint32_t registryCount)
     {
         if (_registries)
             delete[] _registries;
-
+        
         _registries = new uint64_t[registryCount];
+        memset(&_registries[0], 0, sizeof(uint64_t) * registryCount);
     }
     void Destruct()
     {
@@ -19,12 +20,12 @@ public:
 
     bool Prepare()
     {
-        _instructionPointer = 0;
+        _registerOffset = 0;
         _flagRegister = 0;
         return true;
     }
 
-    bool RunInstructions(std::vector<ByteInstruction*>& instructions)
+    bool RunInstructions(ModuleInfo& moduleInfo, std::vector<ByteInstruction*>& instructions)
     {
         for (size_t i = 0; i < instructions.size();)
         {
@@ -150,19 +151,33 @@ public:
                 case ByteOpcode::JMP_CONDITIONAL:
                 {
                     // JMP_CONDITIONAL uses val2 to determine if we should jmp if the last comparison was true/false
-                    if (_flagRegister == instruction->val2)
+                    if (GetFlags() == instruction->val2)
                     {
                         i = instruction->val1;
-                        _flagRegister = 0;
                         continue;
                     }
 
                     break;
                 }
+                case ByteOpcode::ADD_REGISTER_OFFSET:
+                {
+                    _registerOffset += instruction->val1;
+                    break;
+                }
+                case ByteOpcode::SUBTRACT_REGISTER_OFFSET:
+                {
+                    _registerOffset -= instruction->val1;
+                    break;
+                }
+                case ByteOpcode::CALL:
+                {
+                    ASTFunctionDecl* fnDecl = moduleInfo.GetFunctionByNameHash(instruction->val1);
+                    RunInstructions(moduleInfo, fnDecl->GetInstructions());
+                    break;
+                }
                 case ByteOpcode::RETURN:
                 {
-                    // TODO: Handle Nested Function calls here
-                    break;
+                    return true;
                 }
 
                 default:
@@ -175,14 +190,25 @@ public:
         return true;
     }
 
+    // Read & Reset Flags
+    uint8_t GetFlags()
+    {
+        // TODO: Later when we add more flags, we want to specifically request a certain bit in the flag and just reset that one
+        
+        uint8_t val = _flagRegister;
+        _flagRegister = 0;
+
+        return val;
+    }
+
     // Takes a relative Index
     uint64_t* GetRegistry(size_t index)
     {
-        return &_registries[_instructionPointer + index];
+        return &_registries[_registerOffset + index];
     }
 
 private:
-    size_t _instructionPointer = 0;
+    size_t _registerOffset = 0;
     uint8_t _flagRegister = 0;
     uint64_t* _registries = nullptr;
 };

@@ -29,7 +29,7 @@ int Compile(const std::string& fileName)
 {
     ZoneScopedNC("Compile", tracy::Color::Red);
 
-    BytecodeVM vm(1, 10);
+    BytecodeVM vm(1);
     vm.RunScript(fileName);
 
     return 0;

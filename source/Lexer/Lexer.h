@@ -10,8 +10,13 @@
 
 struct LexerFile
 {
-    LexerFile(char* inBuffer, size_t inSize) : buffer(inBuffer), size(static_cast<long>(inSize)), tokens() 
+    LexerFile() { }
+
+    void Init(char* inBuffer, size_t inSize)
     {
+        buffer = inBuffer; 
+        size = static_cast<long>(inSize);
+
         // @TODO: Find a "smarter way?" Right now we assume 1 character is 1 token as a minimum
         tokens.reserve(inSize / 2);
     }

@@ -10,10 +10,16 @@
 
 struct ModuleInfo
 {
-    ModuleInfo(LexerFile& lexerOutput) : _tokens(lexerOutput.tokens), _tokensNum(lexerOutput.tokens.size()) 
+
+    ModuleInfo()
     {
         // Pre allocate 8 functions per module
         _functionNodes.reserve(8);
+    }
+
+    LexerFile& GetLexerFile()
+    {
+        return lexerFile;
     }
 
     inline void SetRegistryCount(uint16_t count)
@@ -52,7 +58,7 @@ struct ModuleInfo
     }
 
     inline const size_t& GetTokenIndex() { return _tokenIndex; }
-    inline const size_t& GetTokenCount() { return _tokensNum; }
+    inline size_t GetTokenCount() { return lexerFile.tokens.size(); }
     inline void ResetIndex() { _tokenIndex = 0; }
 
     void AddFunctionNode(ASTFunctionDecl* fnDecl)
@@ -65,11 +71,30 @@ struct ModuleInfo
     }
 
     // Helper Functions
+    void InitParameter(ASTVariable* param, Token* token, ASTFunctionDecl* fnDecl)
+    {
+        param->UpdateToken(token);
+        param->dataType = GetDataType();
+
+        fnDecl->AddParameter(param);
+    }
     void InitVariable(ASTVariable* variable, Token* token, ASTFunctionDecl* fnDecl)
     {
         variable->UpdateToken(token);
         
         size_t nameHashed = variable->GetNameHashed();
+
+        // Check Parameters
+        for (ASTVariable* var : fnDecl->GetParameters())
+        {
+            if (nameHashed == var->GetNameHashed())
+            {
+                variable->parent = var;
+                break;
+            }
+        }
+
+        // Check Variables
         for (ASTVariable* var : fnDecl->GetVariables())
         {
             if (nameHashed == var->GetNameHashed())
@@ -107,7 +132,7 @@ struct ModuleInfo
     ASTJmpStatement* GetJmpStatement();
     ASTReturnStatement* GetReturnStatement();
     ASTFunctionDecl* GetFunctionDecl();
-    ASTFunctionParameter* GetFunctionParameter();
+    ASTVariable* GetFunctionParameter();
     ASTFunctionCall* GetFunctionCall();
     ASTFunctionArgument* GetFunctionArgument();
     ByteInstruction* GetByteInstruction();
@@ -172,10 +197,10 @@ private:
     {
         ZoneScopedNC("_GetToken", tracy::Color::Green3)
 
-        if (index >= _tokensNum)
+        if (index >= GetTokenCount())
             return false;
 
-        Token& token = _tokens[index];
+        Token& token = lexerFile.tokens[index];
 
         _lineNum = token.lineNum;
         _colNum = token.colNum;
@@ -185,12 +210,11 @@ private:
     }
 
     uint16_t _registryCount = 0;
-
     std::vector<ASTFunctionDecl*> _functionNodes;
-    std::vector<Token>& _tokens;
-    size_t _tokensNum = 0;
-    size_t _tokenIndex = 0;
 
+    LexerFile lexerFile;
+
+    size_t _tokenIndex = 0;
     int _lineNum = 1;
     int _colNum = 1;
 };
@@ -230,18 +254,18 @@ public:
     NaiType GetTypeFromFunctionCall(ModuleInfo& moduleInfo, ASTFunctionCall* fnCall);
 
     // Utils
-    inline NaiType GetTypeFromChar(const char* str, int size)
+    inline static NaiType GetTypeFromChar(const char* str, int size)
     {
         ZoneScopedNC("GetTypeFromChar", tracy::Color::Purple)
 
         size_t hashedStr = StringUtils::hash_djb2(str, size);
 
-        const auto itr = _typeNameHashToNaiType.find(static_cast<uint32_t>(hashedStr));
-        if (itr == _typeNameHashToNaiType.end())
+        const auto itr = typeNameHashToNaiType.find(static_cast<uint32_t>(hashedStr));
+        if (itr == typeNameHashToNaiType.end())
             return NaiType::CUSTOM;
 
         return itr->second;
     }
-private:
-    robin_hood::unordered_map<uint32_t, NaiType> _typeNameHashToNaiType;
+
+    static robin_hood::unordered_map<uint32_t, NaiType> typeNameHashToNaiType;
 };

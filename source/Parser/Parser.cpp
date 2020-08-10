@@ -5,6 +5,24 @@
 
 thread_local Memory::BlockAllocator allocator(64 * 1024 * 1024); // Preallocate 64 MB per thread
 
+// Setup Primitive Types
+robin_hood::unordered_map<uint32_t, NaiType> Parser::typeNameHashToNaiType =
+{
+    {"auto"_djb2, NaiType::INVALID},
+    {"void"_djb2, NaiType::NAI_VOID},
+    {"bool"_djb2, NaiType::U8},
+    {"i8"_djb2, NaiType::I8},
+    {"u8"_djb2, NaiType::U8},
+    {"i16"_djb2, NaiType::I16},
+    {"u16"_djb2, NaiType::U16},
+    {"i32"_djb2, NaiType::I32},
+    {"u32"_djb2, NaiType::U32},
+    {"i64"_djb2, NaiType::I64},
+    {"u64"_djb2, NaiType::U64},
+    {"f32"_djb2, NaiType::F32},
+    {"f64"_djb2, NaiType::F64}
+};
+
 ASTSequence* ModuleInfo::GetSequence()
 {
     ZoneScopedNC("ModuleInfo::GetSequence", tracy::Color::Aquamarine)
@@ -55,10 +73,10 @@ ASTFunctionDecl* ModuleInfo::GetFunctionDecl()
     ZoneScopedNC("ModuleInfo::GetFunctionDecl", tracy::Color::Aquamarine4)
     return allocator.New<ASTFunctionDecl>();
 }
-ASTFunctionParameter* ModuleInfo::GetFunctionParameter()
+ASTVariable* ModuleInfo::GetFunctionParameter()
 {
     ZoneScopedNC("ModuleInfo::GetFunctionParameter", tracy::Color::Aquamarine4)
-    return allocator.New<ASTFunctionParameter>();
+    return allocator.New<ASTVariable>();
 }
 ASTFunctionCall* ModuleInfo::GetFunctionCall()
 {
@@ -79,20 +97,7 @@ ByteInstruction* ModuleInfo::GetByteInstruction()
 
 Parser::Parser()
 {
-    // Setup Primitive Types
-    _typeNameHashToNaiType["auto"_djb2] = NaiType::INVALID;
-    _typeNameHashToNaiType["void"_djb2] = NaiType::NAI_VOID;
-    _typeNameHashToNaiType["bool"_djb2] = NaiType::U8;
-    _typeNameHashToNaiType["i8"_djb2] = NaiType::I8;
-    _typeNameHashToNaiType["u8"_djb2] = NaiType::U8;
-    _typeNameHashToNaiType["i16"_djb2] = NaiType::I16;
-    _typeNameHashToNaiType["u16"_djb2] = NaiType::U16;
-    _typeNameHashToNaiType["i32"_djb2] = NaiType::I32;
-    _typeNameHashToNaiType["u32"_djb2] = NaiType::U32;
-    _typeNameHashToNaiType["i64"_djb2] = NaiType::I64;
-    _typeNameHashToNaiType["u64"_djb2] = NaiType::U64;
-    _typeNameHashToNaiType["f32"_djb2] = NaiType::F32;
-    _typeNameHashToNaiType["f64"_djb2] = NaiType::F64;
+    
 }
 
 bool Parser::Run(ModuleInfo& moduleInfo)
@@ -251,11 +256,8 @@ bool Parser::ParseFunctionParameterList(ModuleInfo& moduleInfo, ASTFunctionDecl*
                 return false;
             }
 
-            ASTFunctionParameter* param = moduleInfo.GetFunctionParameter();
-            param->UpdateToken(identifierToken);
-            param->dataType = moduleInfo.GetDataType();
-
-            fnDecl->AddParameter(param);
+            ASTVariable* param = moduleInfo.GetFunctionParameter();
+            moduleInfo.InitParameter(param, identifierToken, fnDecl);
 
             if (declarationToken->subType == TokenSubType::NONE || declarationToken->subType == TokenSubType::CONST_DECLARATION)
             {
@@ -457,7 +459,6 @@ bool Parser::ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
                                 moduleInfo.EatToken();
 
                                 variable->expression = moduleInfo.GetExpression();
-                                variable->expression->op = ASTOperatorType::ASSIGN;
                                 if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                                     return false;
                             }
@@ -467,7 +468,6 @@ bool Parser::ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
                             variable->dataType->SetType(NaiType::AUTO);
 
                             variable->expression = moduleInfo.GetExpression();
-                            variable->expression->op = ASTOperatorType::ASSIGN;
                             if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                                 return false;
                         }
@@ -588,7 +588,6 @@ bool Parser::ParseFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
                         moduleInfo.EatToken();
                     }
 
-
                     currentSequence->left = returnStmt;
                 }
             }
@@ -636,7 +635,7 @@ bool Parser::ParseFunctionCall(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, 
         while (true)
         {
             Token* argToken = nullptr;
-            if (!moduleInfo.EatToken(&argToken) || (argToken->type != TokenType::IDENTIFIER && argToken->type != TokenType::LITERAL))
+            if (!moduleInfo.GetToken(&argToken) || (argToken->type != TokenType::IDENTIFIER && argToken->type != TokenType::LITERAL))
             {
                 moduleInfo.ReportError("Expected to find 'identifier' or 'literal' for argument.", nullptr);
                 return false;
@@ -671,14 +670,17 @@ bool Parser::ParseFunctionCall(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl, 
 
                     argument->value = variable;
                 }
+
+                // Eat argToken
+                moduleInfo.EatToken();
             }
             else if (argToken->type == TokenType::LITERAL)
             {
-                ASTValue* param = moduleInfo.GetValue();
-                param->UpdateToken(argToken);
-                param->UpdateValue();
+                ASTExpression* expression = moduleInfo.GetExpression();
+                if (!ParseExpression(moduleInfo, fnDecl, expression))
+                    return false;
 
-                argument->value = param;
+                argument->value = expression;
             }
 
             Token* expressionSequenceToken = nullptr;
@@ -799,67 +801,77 @@ bool Parser::ParseExpressionSequence(ModuleInfo& moduleInfo, ASTFunctionDecl* fn
 {
     ZoneScopedNC("Parser::ParseExpressionSequence", tracy::Color::AliceBlue);
 
-    Token* nextToken = nullptr;
-    if (!moduleInfo.EatToken(&nextToken) || (nextToken->type != TokenType::LPAREN && nextToken->type != TokenType::IDENTIFIER && nextToken->type != TokenType::LITERAL))
+    Token* identifierToken = nullptr;
+    if (!moduleInfo.EatToken(&identifierToken) || (identifierToken->type != TokenType::LPAREN && identifierToken->type != TokenType::IDENTIFIER && identifierToken->type != TokenType::LITERAL))
     {
         moduleInfo.ReportError("Expected 'sub expression' or 'value' for expression.", nullptr);
         return false;
-    }
+    }    
 
-    Token* exprSeqToken = nullptr;
-    if (!moduleInfo.GetToken(&exprSeqToken))
-    {
-        moduleInfo.ReportError("Expected 'right parenthesis' for expression.", nullptr);
-        return false;
-    }
-
-    bool isExpressionOperator = exprSeqToken->IsExpressionOperator();
+    // We will reuse this token
+    Token* nextToken = nullptr;
 
     // Sub Expression
-    if (nextToken->type == TokenType::LPAREN)
+    if (identifierToken->type == TokenType::LPAREN)
     {
         ASTExpression* expression = moduleInfo.GetExpression();
         ASTExpression* leftExpression = moduleInfo.GetExpression();
-
         out->right = expression;
+
         expression->left = leftExpression;
+
         if (!ParseExpression(moduleInfo, fnDecl, leftExpression))
             return false;
 
-        // We know this exists due to exprSeqToken succeeding its "GetToken" call
-        moduleInfo.EatToken();
-
-        if (!moduleInfo.GetToken(&exprSeqToken))
+        // Use nextToken
+        if (!moduleInfo.EatToken(&nextToken) || nextToken->type != TokenType::RPAREN)
         {
             moduleInfo.ReportError("Expected 'right parenthesis' for expression.", nullptr);
             return false;
         }
 
-        if (exprSeqToken->IsExpressionOperator())
+        // Use nextToken
+        if (!moduleInfo.GetToken(&nextToken))
         {
-            ASTExpression* expr = moduleInfo.GetExpression();
-            if (!expr->UpdateOperator(exprSeqToken))
+            moduleInfo.ReportError("Expected 'end of line' for expression.", nullptr);
+            return false;
+        }
+
+        if (nextToken->IsExpressionOperator())
+        {
+            if (!expression->UpdateOperator(nextToken))
             {
                 moduleInfo.ReportError("Expected expressional operator for expression value.", nullptr);
                 return false;
             }
 
+            // Eat ExpressionOperator
+            moduleInfo.EatToken();
+
+            ASTExpression* expr = moduleInfo.GetExpression();
             expression->right = expr;
+
             if (!ParseExpression(moduleInfo, fnDecl, expr))
                 return false;
         }
     }
-    else if (nextToken->type == TokenType::IDENTIFIER || nextToken->type == TokenType::LITERAL)
+    else if (identifierToken->type == TokenType::IDENTIFIER || identifierToken->type == TokenType::LITERAL)
     {
-
         ASTNode* valuePtr = nullptr;
-        if (!GetExpressionValueFromToken(moduleInfo, fnDecl, nextToken, &valuePtr))
+        if (!GetExpressionValueFromToken(moduleInfo, fnDecl, identifierToken, &valuePtr))
             return false;
 
-        if (isExpressionOperator)
+        // Reuse nextToken
+        if (!moduleInfo.GetToken(&nextToken))
+        {
+            moduleInfo.ReportError("Expected 'end of line' for expression.", nullptr);
+            return false;
+        }
+
+        if (nextToken->IsExpressionOperator())
         {
             ASTExpression* expression = moduleInfo.GetExpression();
-            if (!expression->UpdateOperator(exprSeqToken))
+            if (!expression->UpdateOperator(nextToken))
             {
                 moduleInfo.ReportError("Expected expressional operator for expression value.", nullptr);
                 return false;
@@ -867,6 +879,9 @@ bool Parser::ParseExpressionSequence(ModuleInfo& moduleInfo, ASTFunctionDecl* fn
 
             expression->left = valuePtr;
             out->right = expression;
+
+            // Eat ExpressionSequenceToken
+            moduleInfo.EatToken();
 
             if (!ParseExpressionSequence(moduleInfo, fnDecl, expression))
                 return false;
@@ -886,6 +901,7 @@ bool Parser::GetExpressionValueFromToken(ModuleInfo& moduleInfo, ASTFunctionDecl
         if (token->subType == TokenSubType::FUNCTION_CALL)
         {
             ASTFunctionCall* fnCall = moduleInfo.GetFunctionCall();
+            fnCall->UpdateToken(token);
 
             if (!ParseFunctionCall(moduleInfo, fnDecl, fnCall))
                 return false;
@@ -1072,7 +1088,6 @@ bool Parser::ParseWhileStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fn
                                 moduleInfo.EatToken();
 
                                 variable->expression = moduleInfo.GetExpression();
-                                variable->expression->op = ASTOperatorType::ASSIGN;
                                 if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                                     return false;
                             }
@@ -1082,7 +1097,6 @@ bool Parser::ParseWhileStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fn
                             variable->dataType->SetType(NaiType::AUTO);
 
                             variable->expression = moduleInfo.GetExpression();
-                            variable->expression->op = ASTOperatorType::ASSIGN;
                             if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                                 return false;
                         }
@@ -1097,7 +1111,6 @@ bool Parser::ParseWhileStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fn
                         }
 
                         variable->expression = moduleInfo.GetExpression();
-                        variable->expression->UpdateOperator(declToken);
                         if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                             return false;
                     }
@@ -1168,6 +1181,41 @@ bool Parser::ParseWhileStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fn
                         moduleInfo.ReportError("Expected to find 'end of line' for break statement(%.*s)", nullptr, jmpStmt->GetNameSize(), jmpStmt->GetName());
                         return false;
                     }
+                }
+                else if (startToken->subType == TokenSubType::KEYWORD_RETURN)
+                {
+                    ASTReturnStatement* returnStmt = moduleInfo.GetReturnStatement();
+
+                    Token* expressionToken = nullptr;
+                    if (!moduleInfo.GetToken(&expressionToken))
+                    {
+                        moduleInfo.ReportError("Expected to find 'end of line' for return statement.", nullptr);
+                        return false;
+                    }
+
+                    if (expressionToken->type != TokenType::END_OF_LINE)
+                    {
+                        if (fnDecl->returnType->GetType() == NaiType::NAI_VOID)
+                        {
+                            moduleInfo.ReportError("Unexpected return value for function(%.*s) with return type 'void'.", nullptr, fnDecl->GetNameSize(), fnDecl->GetName());
+                            return false;
+                        }
+
+                        returnStmt->value = moduleInfo.GetExpression();
+                        returnStmt->value->UpdateToken(expressionToken);
+
+                        if (!ParseExpression(moduleInfo, fnDecl, returnStmt->value))
+                            return false;
+
+                        Token* endToken = nullptr;
+                        if (!moduleInfo.EatToken(&endToken) || endToken->type != TokenType::END_OF_LINE)
+                        {
+                            moduleInfo.ReportError("Expected to find 'end of line' for return statement.", nullptr);
+                            return false;
+                        }
+                    }
+
+                    currentSequence->left = returnStmt;
                 }
             }
 
@@ -1351,7 +1399,6 @@ bool Parser::ParseIfStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDec
                                 moduleInfo.EatToken();
 
                                 variable->expression = moduleInfo.GetExpression();
-                                variable->expression->op = ASTOperatorType::ASSIGN;
                                 if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                                     return false;
                             }
@@ -1361,7 +1408,6 @@ bool Parser::ParseIfStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDec
                             variable->dataType->SetType(NaiType::AUTO);
 
                             variable->expression = moduleInfo.GetExpression();
-                            variable->expression->op = ASTOperatorType::ASSIGN;
                             if (!ParseExpression(moduleInfo, fnDecl, variable->expression))
                                 return false;
                         }
@@ -1466,6 +1512,41 @@ bool Parser::ParseIfStatementBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDec
                         return false;
                     }
                 }
+                else if (startToken->subType == TokenSubType::KEYWORD_RETURN)
+                {
+                    ASTReturnStatement* returnStmt = moduleInfo.GetReturnStatement();
+
+                    Token* expressionToken = nullptr;
+                    if (!moduleInfo.GetToken(&expressionToken))
+                    {
+                        moduleInfo.ReportError("Expected to find 'end of line' for return statement.", nullptr);
+                        return false;
+                    }
+
+                    if (expressionToken->type != TokenType::END_OF_LINE)
+                    {
+                        if (fnDecl->returnType->GetType() == NaiType::NAI_VOID)
+                        {
+                            moduleInfo.ReportError("Unexpected return value for function(%.*s) with return type 'void'.", nullptr, fnDecl->GetNameSize(), fnDecl->GetName());
+                            return false;
+                        }
+
+                        returnStmt->value = moduleInfo.GetExpression();
+                        returnStmt->value->UpdateToken(expressionToken);
+
+                        if (!ParseExpression(moduleInfo, fnDecl, returnStmt->value))
+                            return false;
+
+                        Token* endToken = nullptr;
+                        if (!moduleInfo.EatToken(&endToken) || endToken->type != TokenType::END_OF_LINE)
+                        {
+                            moduleInfo.ReportError("Expected to find 'end of line' for return statement.", nullptr);
+                            return false;
+                        }
+                    }
+
+                    currentSequence->left = returnStmt;
+                }
             }
 
             currentSequence->right = moduleInfo.GetSequence();
@@ -1535,7 +1616,7 @@ bool Parser::ParseIfStatementSequence(ModuleInfo& moduleInfo, ASTFunctionDecl* f
 
 bool Parser::CheckFunctionParameters(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
 {
-    for (ASTFunctionParameter* parameter : fnDecl->GetParameters())
+    for (ASTVariable* parameter : fnDecl->GetParameters())
     {
         NaiType dataType = parameter->dataType->GetType();
 
@@ -1609,12 +1690,12 @@ bool Parser::CheckFunctionBody(ModuleInfo& moduleInfo, ASTFunctionDecl* fnDecl)
             ASTFunctionCall* fnCall = static_cast<ASTFunctionCall*>(left);
             ASTFunctionDecl* functionDecl = moduleInfo.GetFunctionByNameHash(fnCall->GetNameHashed());
             
-            std::vector<ASTFunctionParameter*> fnParameters = functionDecl->GetParameters();
+            std::vector<ASTVariable*> fnParameters = functionDecl->GetParameters();
             std::vector<ASTFunctionArgument*> fnArguments = fnCall->GetArguments();
 
             for (size_t i = 0; i < fnArguments.size(); i++)
             {
-                ASTFunctionParameter* param = fnParameters[i];
+                ASTVariable* param = fnParameters[i];
                 ASTFunctionArgument* arg = fnArguments[i];
 
                 ASTNode* value = arg->value;
@@ -1734,7 +1815,7 @@ bool Parser::GetTypeFromExpression(ModuleInfo& moduleInfo, NaiType& outType, AST
         }
         else if (left->type == ASTNodeType::EXPRESSION)
         {
-            // TODO: Implement nested expression value logic here
+            GetTypeFromExpression(moduleInfo, lType, static_cast<ASTExpression*>(left));
         }
     }
 
@@ -1749,11 +1830,7 @@ bool Parser::GetTypeFromExpression(ModuleInfo& moduleInfo, NaiType& outType, AST
     {
         if (right)
         {
-            if (right->type == ASTNodeType::EXPRESSION)
-            {
-                GetTypeFromExpression(moduleInfo, rType, static_cast<ASTExpression*>(expression->right));
-            }
-            else if (right->type == ASTNodeType::VALUE)
+            if (right->type == ASTNodeType::VALUE)
             {
                 ASTValue* litera = static_cast<ASTValue*>(right);
                 litera->dataType = moduleInfo.GetDataType();
@@ -1773,9 +1850,9 @@ bool Parser::GetTypeFromExpression(ModuleInfo& moduleInfo, NaiType& outType, AST
                 ASTFunctionCall* fnCall = static_cast<ASTFunctionCall*>(left);
                 rType = GetTypeFromFunctionCall(moduleInfo, fnCall);
             }
-            else if (right->type == ASTNodeType::EXPRESSION)
+            else if(right->type == ASTNodeType::EXPRESSION)
             {
-                // TODO: Implement nested expression value logic here
+                GetTypeFromExpression(moduleInfo, rType, static_cast<ASTExpression*>(expression->right));
             }
 
             if (rType == NaiType::INVALID)

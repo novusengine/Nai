@@ -29,6 +29,9 @@ enum class ByteOpcode : uint8_t
     COMPARE_NOT_EQUAL_REG_TO_REG,       // Register, Register
     JMP,                                // Val
     JMP_CONDITIONAL,                    // Val, Val
+    ADD_REGISTER_OFFSET,                // Val
+    SUBTRACT_REGISTER_OFFSET,           // Val
+    CALL,                               // Val
     RETURN,                             // VM Keeps track of the instruction pointer
 };
 
