@@ -11,7 +11,10 @@ enum MyName : i32
 struct MyStruct
 {
     myVariable : i32;
-    myConstVariable :: i32 = 0;
+    myConstVariable :: i32 = false;
+    myUninitializedVariable : i32 = ---;
+    myNullptrVariable : i32 = nullptr;
+    myConstPtrVariable :: i32* = nullptr;
 
     fn MyFunction() -> bool
     {
@@ -20,15 +23,16 @@ struct MyStruct
 }
 
 #[Name = "Function Test", ParseResult = true]
-fn main(player : i32) -> i32
+fn main(player : i32*) -> i32*
 {
+    test : i32* = nullptr;
     testfail();
     
     if (true) { }
     else if (false) { }
     else { }
     
-    test : i32 = ((5));
+    test : i32 = ---;
     
     test = 5.5 + 5.5;
     test = 5.5f - 5.5f;
@@ -83,7 +87,7 @@ fn main(player : i32) -> i32
     for (test : i32; 3 < 1;) { }
     for (test : i32; 3 < 1; test.function() += 1) { }
     for (test : i32 = 5; 4 < 1;) { }
-    for (test : i32 = 5; 4 < 1; test.member = test.function()) { }
+    for (test : i32* = 5; 4 < 1; test.member = test.function()) { }
     
     foreach (item in player.items)
     {
