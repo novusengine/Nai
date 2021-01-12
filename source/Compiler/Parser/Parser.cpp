@@ -71,7 +71,10 @@ enum class ParseRuleSet
     IDENTIFIER,
     STRING,
     DECLARATION,
+    DATATYPE,
+    DATATYPE_SEQUENCE,
     DECLARATION_ASSIGNMENT,
+    DECLARATION_ASSIGNMENT_ACTION,
     DECLARATION_ASSIGNMENT_FORCE,
     ASSIGNMENT,
     ACCESS,
@@ -285,6 +288,7 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                             case Token::Type::STRING:
                             case Token::Type::KEYWORD_TRUE:
                             case Token::Type::KEYWORD_FALSE:
+                            case Token::Type::KEYWORD_NULLPTR:
                                 tokenTypeStack.push(currentToken.type);
 
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION_SEQUENCE);
@@ -545,8 +549,10 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                         switch (currentToken.type)
                         {
                             case Token::Type::RETURN_TYPE:
-                                tokenTypeStack.push(Token::Type::DATATYPE);
                                 tokenTypeStack.push(Token::Type::RETURN_TYPE);
+
+                                ruleSetStack.push(ParseRuleSet::DATATYPE_SEQUENCE);
+                                ruleSetStack.push(ParseRuleSet::DATATYPE);
                                 break;
 
                             case Token::Type::LBRACE:
@@ -1450,8 +1456,9 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                         switch (currentToken.type)
                         {
                             case Token::Type::DECLARATION:
-                                tokenTypeStack.push(Token::Type::DATATYPE);
                                 tokenTypeStack.push(Token::Type::DECLARATION);
+
+                                ruleSetStack.push(ParseRuleSet::DATATYPE);
                                 break;
 
                             default:
@@ -1541,12 +1548,38 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                         {
                             case Token::Type::DECLARATION:
                             case Token::Type::DECLARATION_CONST:
-                                tokenTypeStack.push(Token::Type::DATATYPE);
                                 tokenTypeStack.push(currentToken.type);
+
+                                ruleSetStack.push(ParseRuleSet::DATATYPE_SEQUENCE);
+                                ruleSetStack.push(ParseRuleSet::DATATYPE);
                                 break;
 
                             default:
                                 localDidError = true;
+                                break;
+                        }
+                        break;
+                    }
+                    case ParseRuleSet::DATATYPE:
+                    {
+                        switch (currentToken.type)
+                        {
+                            case Token::Type::DATATYPE:
+                                tokenTypeStack.push(Token::Type::DATATYPE);
+
+                            default:
+                                break;
+                        }
+                        break;
+                    }
+                    case ParseRuleSet::DATATYPE_SEQUENCE:
+                    {
+                        switch (currentToken.type)
+                        {
+                            case Token::Type::POINTER:
+                                tokenTypeStack.push(Token::Type::POINTER);
+
+                            default:
                                 break;
                         }
                         break;
@@ -1558,7 +1591,7 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                             case Token::Type::ASSIGN:
                                 tokenTypeStack.push(Token::Type::ASSIGN);
 
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION);
+                                ruleSetStack.push(ParseRuleSet::DECLARATION_ASSIGNMENT_ACTION);
                                 break;
 
                             case Token::Type::END_OF_LINE:
@@ -1570,6 +1603,21 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                         }
                         break;
                     }
+                    case ParseRuleSet::DECLARATION_ASSIGNMENT_ACTION:
+                    {
+                        switch (currentToken.type)
+                        {
+                            case Token::Type::UNINITIALIZED:
+                            case Token::Type::KEYWORD_NULLPTR:
+                                tokenTypeStack.push(currentToken.type);
+                                break;
+
+                            default:
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION);
+                                break;
+                        }
+                        break;
+                    }
                     case ParseRuleSet::DECLARATION_ASSIGNMENT_FORCE:
                     {
                         switch (currentToken.type)
@@ -1577,7 +1625,7 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                             case Token::Type::ASSIGN:
                                 tokenTypeStack.push(Token::Type::ASSIGN);
 
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION);
+                                ruleSetStack.push(ParseRuleSet::DECLARATION_ASSIGNMENT_ACTION);
                                 break;
 
                             default:

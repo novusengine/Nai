@@ -19,6 +19,7 @@ const char* KEYWORD_TRUE = "true";
 const char* KEYWORD_FALSE = "false";
 const char* KEYWORD_BREAK = "break";
 const char* KEYWORD_CONTINUE = "continue";
+const char* KEYWORD_NULLPTR = "nullptr";
 const char* KEYWORD_RETURN = "return";
 const char* KEYWORD_SINGLE_COMMENT = "//";
 const char* KEYWORD_MULTI_COMMENT_START = "/*";
@@ -45,6 +46,7 @@ robin_hood::unordered_map<std::string_view, Token::Type> Lexer::_keywordStringTo
     { KEYWORD_FALSE, Token::Type::KEYWORD_FALSE },
     { KEYWORD_BREAK, Token::Type::KEYWORD_BREAK },
     { KEYWORD_CONTINUE, Token::Type::KEYWORD_CONTINUE },
+    { KEYWORD_NULLPTR, Token::Type::KEYWORD_NULLPTR },
     { KEYWORD_RETURN, Token::Type::KEYWORD_RETURN }
 };
 
@@ -771,7 +773,7 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
         {
             type = Token::Type::MINUS;
 
-            switch (*character)
+            switch (*character++)
             {
                 case '=':
                 {
@@ -784,6 +786,18 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
                 {
                     type = Token::Type::RETURN_TYPE;
                     specialCharacterLength += 1;
+                    break;
+                }
+
+                case '-':
+                {
+                    switch (*character)
+                    {
+                        case '-':
+                            type = Token::Type::UNINITIALIZED;
+                            specialCharacterLength += 2;
+                            break;
+                    }
                     break;
                 }
             }
@@ -818,7 +832,7 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
         {
             type = Token::Type::DECLARATION;
 
-            switch (*character++)
+            switch (*character)
             {
                 case ':':
                 {
@@ -1017,6 +1031,17 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
     token.stringview = std::string_view(&buffer[bufferPosition], specialCharacterLength);
     token.lineNum = lineNum;
     token.colNum = colNum;
+
+    // Custom Rules
+    if (tokens.size() > 1)
+    {
+        Token& prevToken = tokens[tokens.size() - 2];
+
+        if (token.type == Token::Type::ASTERISK && prevToken.type == Token::Type::DATATYPE)
+        {
+            token.type = Token::Type::POINTER;
+        }
+    }
 
     bufferPosition += specialCharacterLength;
     colNum += specialCharacterLength;

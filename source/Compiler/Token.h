@@ -41,6 +41,7 @@ public:
         NUMERIC_HEX,
         STRING,
         DATATYPE,
+        POINTER,
         KEYWORD_FUNCTION,
         KEYWORD_STRUCT,
         KEYWORD_ENUM,
@@ -56,9 +57,11 @@ public:
         KEYWORD_IN,
         KEYWORD_TRUE,
         KEYWORD_FALSE,
+        KEYWORD_NULLPTR,
 
         // Custom Special/Operator Types
         ATTRIBUTE,
+        UNINITIALIZED,
         DECLARATION_CONST,
         NOT_EQUALS,
         MODULUS_EQUALS,
