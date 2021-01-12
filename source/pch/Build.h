@@ -23,10 +23,17 @@
 #endif
 
 #define NOMINMAX
-constexpr unsigned int NAI_BYTECODE_STACK_SIZE = 1000000; // 1 MB
 
 #include <Tracy.hpp>
 #include <cstddef>
 #include <string>
 #include <cmath>
 #include <cassert>
+
+template<class T> constexpr T operator~ (T a) { return (T)~(int)a; }
+template<class T> constexpr T operator| (T a, T b) { return (T)((int)a | (int)b); }
+template<class T> constexpr T operator& (T a, T b) { return (T)((int)a & (int)b); }
+template<class T> constexpr T operator^ (T a, T b) { return (T)((int)a ^ (int)b); }
+template<class T> constexpr T& operator|= (T& a, T b) { return (T&)((int&)a |= (int)b); }
+template<class T> constexpr T& operator&= (T& a, T b) { return (T&)((int&)a &= (int)b); }
+template<class T> constexpr T& operator^= (T& a, T b) { return (T&)((int&)a ^= (int)b); }

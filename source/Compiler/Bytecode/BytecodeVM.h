@@ -5,30 +5,13 @@
 #include <filesystem>
 #include <Utils/FileReader.h>
 
+#include "../ModuleInfo.h"
 #include "../Lexer/Lexer.h"
 #include "../Parser/Parser.h"
 #include "BytecodeGenerator.h"
 #include "BytecodeContext.h"
 
 namespace fs = std::filesystem;
-
-class BytecodeVM;
-struct VMFunctionCall
-{
-public:
-    bool Parse(BytecodeVM* vm, std::string signature, void* inCallback);
-
-public:
-    std::string_view name;
-
-    NaiType returnData;
-    std::vector<NaiType> arguments;
-    
-    void* callback = nullptr;
-
-private:
-    LexerFile _lexerFile;
-};
 
 class BytecodeVM
 {
@@ -40,32 +23,20 @@ public:
 
     BytecodeContext& GetContext()
     {
-        _contextMutex.lock();
-
-        BytecodeContext& context = _contexts[_contextIndex++];
-
         if (_contextIndex == _contexts.size())
             _contextIndex = 0;
 
-        _contextMutex.unlock();
-
-        return context;
+        return _contexts[_contextIndex++];
     }
 
 private:
     bool Compile(FileReader& reader, ModuleInfo& moduleInfo);
     bool Run(ModuleInfo& moduleInfo, size_t fnNameHash);
 
-    friend struct VMFunctionCall;
-    Lexer& GetLexer() { return _lexer; }
 private:
-    uint16_t _contextIndex = 0; // Round Robin when we handle GetContext
-    std::mutex _contextMutex;
+    std::atomic<uint16_t> _contextIndex = 0; // Round Robin when we handle GetContext
     std::vector<BytecodeContext> _contexts;
     std::vector<ModuleInfo> _modules;
 
-    Lexer _lexer;
-
-    Parser _parser;
     BytecodeGenerator _bytecodeGenerater;
 };

@@ -16,6 +16,7 @@ enum class NaiType : uint32_t
     U64,
     F32,
     F64,
+    STRING,
     
     CUSTOM = 64
 };

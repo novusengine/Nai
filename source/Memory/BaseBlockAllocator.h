@@ -5,15 +5,15 @@
 namespace Memory
 {
 #pragma pack(push, 1)
-    class Allocator
+    class BaseBlockAllocator
     {
     public:
-        Allocator(const size_t blockSize) : _blockSize(blockSize), _blockNum(0)
+        BaseBlockAllocator(const size_t blockSize) : _blockSize(blockSize), _blockNum(0)
         {
             assert(blockSize > 0);
             AddBlock();
         }
-        ~Allocator()
+        ~BaseBlockAllocator()
         {
             // Free Blocks
             MemoryBlock* currentBlock = _startBlock;

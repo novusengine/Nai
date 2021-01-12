@@ -2,14 +2,17 @@
 #include <iostream>
 #include <chrono>
 
-#include "Lexer/Lexer.h"
-#include "Parser/Parser.h"
-#include "Bytecode/BytecodeGenerator.h"
-#include "Bytecode/BytecodeVM.h"
+#include "Compiler/Lexer/Lexer.h"
+#include "Compiler/Parser/Parser.h"
+#include "Compiler/Bytecode/BytecodeGenerator.h"
+#include "Compiler/Bytecode/BytecodeVM.h"
 
-#include "UnitTester/UnitTester.h"
 #include "Utils/CLIParser.h"
 
+#ifdef _WIN32
+#include <Windows.h>
+#include <WinBase.h>
+#endif
 
 #ifdef TRACY_ENABLE
 void* operator new(std::size_t count)
@@ -39,6 +42,11 @@ int main(int argc, char* argv[])
 {
     ZoneScoped;
 
+#ifdef _WIN32
+    SetPriorityClass(GetCurrentProcess(), REALTIME_PRIORITY_CLASS);
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_HIGHEST);
+#endif
+
     CLIParser cliParser; // Default implicit parameters are "executable" which gets the path to the current executable, and "filename" which gets the file we're acting on
 
     cliParser.AddParameter("unittest", "Runs a unittest on the file")
@@ -53,23 +61,5 @@ int main(int argc, char* argv[])
     }
 
     std::string filename = values["filename"_h].As<std::string>();
-
-    if (values["unittest"_h].WasDefined())
-    {
-        if (!values["testoutput"_h].WasDefined())
-        {
-            std::cout << "ERROR: If you use the unittest flag you also need testoutput to be set" << std::endl;
-            cliParser.PrintHelp();
-            return -1;
-        }
-
-        std::string testOutputPath = values["testoutput"_h].As<std::string>();
-
-        UnitTester unitTester;
-        return unitTester.UnitTest(filename, testOutputPath);
-    }
-    else
-    {
-        return Compile(filename);
-    }
+    return Compile(filename);
 }

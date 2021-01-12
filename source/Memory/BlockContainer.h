@@ -1,16 +1,16 @@
 #pragma once
 #include <pch/Build.h>
 #include "Memory/MemoryBlock.h"
-#include "Memory/Allocator.h"
+#include "Memory/BaseBlockAllocator.h"
 
 namespace Memory
 {
 #pragma pack(push, 1)
-    class BlockContainer : public Allocator
+    class BlockContainer : public BaseBlockAllocator
     {
     public:
         // Defaults blockSize to 1 MB
-        BlockContainer(const size_t blockSize = 1 * 1024 * 1024) : Allocator(blockSize) { }
+        BlockContainer(const size_t blockSize = 1 * 1024 * 1024) : BaseBlockAllocator(blockSize) { }
 
         template <typename T>
         void Store(T* t)
