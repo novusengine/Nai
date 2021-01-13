@@ -45,6 +45,12 @@ fn main(player : i32*) -> i32*
     test = 5 << 5;
 
     test = "hi";
+    test++;
+    test--;
+    test = test++;
+    test = test--;
+    test = test++ + test--;
+    test = test-- + test++;
     
     func(1, 1.1, 1.1f, "This is a string", test.func());
     test = func(1, 1.1, 1.1f, "This is a string", func());
@@ -53,6 +59,8 @@ fn main(player : i32*) -> i32*
     test = test.member.test().another.test;
     test.func(true);
     test = test.func(false);
+    test = test.func(false)++;
+    test = test.func(false)--;
 
     if (true)
     {
@@ -83,10 +91,17 @@ fn main(player : i32*) -> i32*
         test.function();
     }
     for (test = 5; 2 < 1;) { }
+    for (test++; 2 < 1;) { }
+    for (test++; 2 < 1; test--) { }
+    for (test--; 2 < 1;) { }
+    for (test--; 2 < 1; test++) { }
+    for (test = 0; test++ < 1;) { }
+    for (test = 0; test-- < 1;) { }
     for (test = 5; 2 < 1; test.member += 5) { }
     for (test : i32; 3 < 1;) { }
     for (test : i32; 3 < 1; test.function() += 1) { }
     for (test : i32 = 5; 4 < 1;) { }
+    for (test : i32* = 5; 4 < 1; test.function()) { }
     for (test : i32* = 5; 4 < 1; test.member = test.function()) { }
     
     foreach (item in player.items)
