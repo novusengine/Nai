@@ -82,6 +82,8 @@ public:
         POW_EQUALS,
         BITWISE_OR_EQUALS,
         OR,
+        INCREMENT,
+        DECREMENT,
 
         // Alias
         PARAM_SEPERATOR = COMMA,

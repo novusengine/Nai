@@ -758,6 +758,13 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
                     specialCharacterLength += 1;
                     break;
                 }
+
+                case '+':
+                {
+                    type = Token::Type::INCREMENT;
+                    specialCharacterLength += 1;
+                    break;
+                }
             }
 
             break;
@@ -791,11 +798,14 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
 
                 case '-':
                 {
+                    type = Token::Type::DECREMENT;
+                    specialCharacterLength += 1;
+
                     switch (*character)
                     {
                         case '-':
                             type = Token::Type::UNINITIALIZED;
-                            specialCharacterLength += 2;
+                            specialCharacterLength += 1;
                             break;
                     }
                     break;

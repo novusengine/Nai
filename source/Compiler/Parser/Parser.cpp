@@ -326,6 +326,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION_IDENTIFIER_ARRAY_ACCESS);
                                 break;
 
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
+                                break;
+
                             case Token::Type::ASTERISK:
                             case Token::Type::PLUS:
                             case Token::Type::MINUS:
@@ -370,6 +375,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION_IDENTIFIER_ARRAY_ACCESS);
                                 break;
 
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
+                                break;
+
                             case Token::Type::ASTERISK:
                             case Token::Type::PLUS:
                             case Token::Type::MINUS:
@@ -412,6 +422,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION_IDENTIFIER_ARRAY_ACCESS);
                                 ruleSetStack.push(ParseRuleSet::CLOSE_BRACKET);
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION);
+                                break;
+
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
                                 break;
 
                             case Token::Type::ASTERISK:
@@ -655,6 +670,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_IDENTIFIER_ACCESS);
                                 break;
 
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
+                                break;
+
                             case Token::Type::ASSIGN:
                             case Token::Type::MODULUS_EQUALS:
                             case Token::Type::BITWISE_AND_EQUALS:
@@ -698,6 +718,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION);
                                 break;
 
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
+                                break;
+
                             case Token::Type::ASSIGN:
                             case Token::Type::MODULUS_EQUALS:
                             case Token::Type::BITWISE_AND_EQUALS:
@@ -737,6 +762,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_IDENTIFIER_ARRAY_ACCESS);
                                 ruleSetStack.push(ParseRuleSet::CLOSE_BRACKET);
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION);
+                                break;
+
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
                                 break;
 
                             case Token::Type::ASSIGN:
@@ -921,6 +951,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::ASSIGNMENT);
                                 break;
 
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
+                                break;
+
                             case Token::Type::END_OF_LINE:
                                 break;
 
@@ -961,6 +996,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_FOR_HEADER_ACTION_ACCESS);
                                 break;
 
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
+                                break;
+
                             case Token::Type::ASSIGN:
                             case Token::Type::MODULUS_EQUALS:
                             case Token::Type::BITWISE_AND_EQUALS:
@@ -996,6 +1036,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::ACCESS);
                                 break;
 
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
+                                break;
+
                             case Token::Type::ASSIGN:
                             case Token::Type::MODULUS_EQUALS:
                             case Token::Type::BITWISE_AND_EQUALS:
@@ -1008,6 +1053,9 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                             case Token::Type::POW_EQUALS:
                             case Token::Type::BITWISE_OR_EQUALS:
                                 ruleSetStack.push(ParseRuleSet::ASSIGNMENT);
+                                break;
+
+                            case Token::Type::RPAREN:
                                 break;
 
                             default:
@@ -1242,6 +1290,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                         {
                             case Token::Type::LPAREN:
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_CALL_PARAMETER_LIST);
+                                break;
+
+                            case Token::Type::INCREMENT:
+                            case Token::Type::DECREMENT:
+                                tokenTypeStack.push(currentToken.type);
                                 break;
 
                             case Token::Type::ASTERISK:
