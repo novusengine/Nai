@@ -43,6 +43,16 @@ fn main(player : i32*) -> i32*
     test = 5 | 5u;
     test = 5u >> 5;
     test = 5 << 5;
+    
+    test += 5;
+    test -= 5.5f;
+    test *= 5.5;
+    test /= 5;
+    test &= 5;
+    test %= 5u;
+    test |= 5;
+    test >>= 5u;
+    test <<= 5;
 
     test = "hi";
     test++;
@@ -108,6 +118,14 @@ fn main(player : i32*) -> i32*
     {
         break;
     }
+
+    foreach (index, value in player.items)
+    {
+        break;
+    }
+
+    myTestVar1, myTestVar2 = functionCall();
+    myTestVar1, myTestVar2 = [5, 5];
 
     player.items[0].level += 1;
 
