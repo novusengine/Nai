@@ -42,11 +42,8 @@ enum class ParseRuleSet
     FUNCTION_FOR_HEADER_IDENTIFIER_ACTION,
     FUNCTION_FOR_HEADER_CONDITION,
     FUNCTION_FOR_HEADER_ACTION,
-    FUNCTION_FOR_HEADER_ACTION_TYPE,
-    FUNCTION_FOR_HEADER_ACTION_ACCESS,
     FUNCTION_FOREACH,
-    FUNCTION_FOREACH_IDENTIFIER,
-    FUNCTION_FOREACH_IDENTIFIER_ACTION,
+    FUNCTION_FOREACH_ACTION,
     FUNCTION_FOREACH_IN,
     FUNCTION_FOREACH_IDENTIFIER_SEQUENCE,
     FUNCTION_FOREACH_IDENTIFIER_ACCESS,
@@ -74,14 +71,15 @@ enum class ParseRuleSet
 
     IDENTIFIER,
     STRING,
-    DECLARATION,
     DATATYPE,
     DATATYPE_SEQUENCE,
+    DECLARATION,
     DECLARATION_ASSIGNMENT,
     DECLARATION_ASSIGNMENT_ACTION,
     DECLARATION_ASSIGNMENT_FORCE,
     ASSIGNMENT,
     ACCESS,
+    ASTERISK,
     PARAM_SEPERATOR,
     OPEN_PAREN,
     OPEN_BRACE,
@@ -118,7 +116,6 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
 
             std::stack<ParseRuleSet> ruleSetStack;
             std::stack<Token::Type> tokenTypeStack;
-            tokenTypeStack.push(Token::Type::NONE);
 
             std::string_view currentAttributeName = "";
 
@@ -145,6 +142,8 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                     ruleSetStack.push(ParseRuleSet::OPEN_BRACKET);
                     ruleSetStack.push(ParseRuleSet::ATTRIBUTE);
                 }
+
+                tokenTypeStack.push(Token::Type::NONE);
             }
 
             for (int tokenIndex = 0; tokenIndex < numTokens;)
@@ -282,6 +281,13 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION_SEQUENCE);
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION_IDENTIFIER);
                                 ruleSetStack.push(ParseRuleSet::IDENTIFIER);
+                                break;
+
+                            case Token::Type::ASTERISK:
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION_SEQUENCE);
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION_IDENTIFIER);
+                                ruleSetStack.push(ParseRuleSet::IDENTIFIER);
+                                ruleSetStack.push(ParseRuleSet::ASTERISK);
                                 break;
 
                             case Token::Type::NUMERIC_SIGNED:
@@ -587,6 +593,12 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                     {
                         switch (currentToken.type)
                         {
+                            case Token::Type::ASTERISK:
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_BODY);
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_IDENTIFIER);
+                                ruleSetStack.push(ParseRuleSet::ASTERISK);
+                                break;
+
                             case Token::Type::IDENTIFIER:
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_BODY);
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_IDENTIFIER);
@@ -815,6 +827,7 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 break;
 
                             case Token::Type::END_OF_LINE:
+                            case Token::Type::RPAREN:
                                 break;
 
                             default:
@@ -1052,8 +1065,14 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                         switch (currentToken.type)
                         {
                             case Token::Type::IDENTIFIER:
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOR_HEADER_ACTION_TYPE);
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_IDENTIFIER_ACTION);
                                 ruleSetStack.push(ParseRuleSet::IDENTIFIER);
+                                break;
+
+                            case Token::Type::ASTERISK:
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_IDENTIFIER_ACTION);
+                                ruleSetStack.push(ParseRuleSet::IDENTIFIER);
+                                ruleSetStack.push(ParseRuleSet::ASTERISK);
                                 break;
 
                             case Token::Type::RPAREN:
@@ -1063,82 +1082,6 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 localDidError = true;
                                 break;
                         }
-                        break;
-                    }
-                    case ParseRuleSet::FUNCTION_FOR_HEADER_ACTION_TYPE:
-                    {
-                        switch (currentToken.type)
-                        {
-                            case Token::Type::PERIOD:
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOR_HEADER_ACTION_ACCESS);
-                                break;
-
-                            case Token::Type::INCREMENT:
-                            case Token::Type::DECREMENT:
-                                tokenTypeStack.push(currentToken.type);
-                                break;
-
-                            case Token::Type::ASSIGN:
-                            case Token::Type::MODULUS_EQUALS:
-                            case Token::Type::BITWISE_AND_EQUALS:
-                            case Token::Type::MULTIPLY_EQUALS:
-                            case Token::Type::PLUS_EQUALS:
-                            case Token::Type::MINUS_EQUALS:
-                            case Token::Type::DIVIDE_EQUALS:
-                            case Token::Type::BITSHIFT_LEFT_EQUALS:
-                            case Token::Type::BITSHIFT_RIGHT_EQUALS:
-                            case Token::Type::POW_EQUALS:
-                            case Token::Type::BITWISE_OR_EQUALS:
-                                ruleSetStack.push(ParseRuleSet::ASSIGNMENT);
-                                break;
-
-                            default:
-                                localDidError = true;
-                                break;
-                        }
-                        break;
-                    }
-                    case ParseRuleSet::FUNCTION_FOR_HEADER_ACTION_ACCESS:
-                    {
-                        switch (currentToken.type)
-                        {
-                            case Token::Type::LPAREN:
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOR_HEADER_ACTION_ACCESS);
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_CALL_PARAMETER_LIST);
-                                break;
-
-                            case Token::Type::PERIOD:
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOR_HEADER_ACTION_ACCESS);
-                                ruleSetStack.push(ParseRuleSet::IDENTIFIER);
-                                ruleSetStack.push(ParseRuleSet::ACCESS);
-                                break;
-
-                            case Token::Type::INCREMENT:
-                            case Token::Type::DECREMENT:
-                                tokenTypeStack.push(currentToken.type);
-                                break;
-
-                            case Token::Type::ASSIGN:
-                            case Token::Type::MODULUS_EQUALS:
-                            case Token::Type::BITWISE_AND_EQUALS:
-                            case Token::Type::MULTIPLY_EQUALS:
-                            case Token::Type::PLUS_EQUALS:
-                            case Token::Type::MINUS_EQUALS:
-                            case Token::Type::DIVIDE_EQUALS:
-                            case Token::Type::BITSHIFT_LEFT_EQUALS:
-                            case Token::Type::BITSHIFT_RIGHT_EQUALS:
-                            case Token::Type::POW_EQUALS:
-                            case Token::Type::BITWISE_OR_EQUALS:
-                                ruleSetStack.push(ParseRuleSet::ASSIGNMENT);
-                                break;
-
-                            case Token::Type::RPAREN:
-                                break;
-
-                            default:
-                                localDidError = true;
-                                break;
-                            }
                         break;
                     }
 
@@ -1154,8 +1097,8 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                                 ruleSetStack.push(ParseRuleSet::OPEN_BRACE);
 
                                 ruleSetStack.push(ParseRuleSet::CLOSE_PAREN);
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_IDENTIFIER_ACTION);
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_IDENTIFIER);
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_ACTION);
+                                ruleSetStack.push(ParseRuleSet::IDENTIFIER);
                                 ruleSetStack.push(ParseRuleSet::OPEN_PAREN);
                                 break;
 
@@ -1165,35 +1108,20 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                         }
                         break;
                     }
-                    case ParseRuleSet::FUNCTION_FOREACH_IDENTIFIER:
-                    {
-                        switch (currentToken.type)
-                        {
-                            case Token::Type::IDENTIFIER:
-                                ruleSetStack.push(ParseRuleSet::IDENTIFIER);
-                                break;
-
-                            default:
-                                localDidError = true;
-                                break;
-                        }
-                        break;
-                    }
-                    case ParseRuleSet::FUNCTION_FOREACH_IDENTIFIER_ACTION:
+                    case ParseRuleSet::FUNCTION_FOREACH_ACTION:
                     {
                         switch (currentToken.type)
                         {
                             case Token::Type::PARAM_SEPERATOR:
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_IDENTIFIER_SEQUENCE);
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_IDENTIFIER);
+                                ruleSetStack.push(ParseRuleSet::IDENTIFIER);
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_IN);
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_IDENTIFIER);
+                                ruleSetStack.push(ParseRuleSet::IDENTIFIER);
                                 ruleSetStack.push(ParseRuleSet::PARAM_SEPERATOR);
                                 break;
 
                             case Token::Type::KEYWORD_IN:
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_IDENTIFIER_SEQUENCE);
-                                ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_IDENTIFIER);
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION);
                                 ruleSetStack.push(ParseRuleSet::FUNCTION_FOREACH_IN);
                                 break;
 
@@ -1694,24 +1622,6 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                         }
                         break;
                     }
-                    case ParseRuleSet::DECLARATION:
-                    {
-                        switch (currentToken.type)
-                        {
-                            case Token::Type::DECLARATION:
-                            case Token::Type::DECLARATION_CONST:
-                                tokenTypeStack.push(currentToken.type);
-
-                                ruleSetStack.push(ParseRuleSet::DATATYPE_SEQUENCE);
-                                ruleSetStack.push(ParseRuleSet::DATATYPE);
-                                break;
-
-                            default:
-                                localDidError = true;
-                                break;
-                        }
-                        break;
-                    }
                     case ParseRuleSet::DATATYPE:
                     {
                         switch (currentToken.type)
@@ -1733,6 +1643,24 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
 
                             default:
                                 break;
+                        }
+                        break;
+                    }
+                    case ParseRuleSet::DECLARATION:
+                    {
+                        switch (currentToken.type)
+                        {
+                        case Token::Type::DECLARATION:
+                        case Token::Type::DECLARATION_CONST:
+                            tokenTypeStack.push(currentToken.type);
+
+                            ruleSetStack.push(ParseRuleSet::DATATYPE_SEQUENCE);
+                            ruleSetStack.push(ParseRuleSet::DATATYPE);
+                            break;
+
+                        default:
+                            localDidError = true;
+                            break;
                         }
                         break;
                     }
@@ -1762,6 +1690,11 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                             case Token::Type::UNINITIALIZED:
                             case Token::Type::KEYWORD_NULLPTR:
                                 tokenTypeStack.push(currentToken.type);
+                                break;
+
+                            case Token::Type::AMPERSAND:
+                                tokenTypeStack.push(Token::Type::AMPERSAND);
+                                ruleSetStack.push(ParseRuleSet::FUNCTION_EXPRESSION);
                                 break;
 
                             default:
@@ -1818,6 +1751,20 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
                         {
                             case Token::Type::PERIOD:
                                 tokenTypeStack.push(Token::Type::PERIOD);
+                                break;
+
+                            default:
+                                localDidError = true;
+                                break;
+                        }
+                        break;
+                    }
+                    case ParseRuleSet::ASTERISK:
+                    {
+                        switch (currentToken.type)
+                        {
+                            case Token::Type::ASTERISK:
+                                tokenTypeStack.push(Token::Type::ASTERISK);
                                 break;
 
                             default:
@@ -1981,9 +1928,16 @@ bool Parser::CheckSyntax(ModuleInfo& moduleInfo)
     return errorCount == 0;
 }
 
-bool Parser::CreateAST(ModuleInfo& /*moduleInfo*/)
+bool Parser::CreateAST(ModuleInfo& moduleInfo)
 {
-    return true;
+    std::atomic<int> errorCount = 0;
+
+    std::for_each(std::execution::par, moduleInfo.compileUnits.begin(), moduleInfo.compileUnits.end(),
+        [&errorCount](CompileUnit& compileUnit)
+        {
+        });
+
+    return errorCount == 0;
 }
 
 bool Parser::CheckSemantics(ModuleInfo& /*moduleInfo*/)

@@ -1047,6 +1047,7 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
     {
         Token& prevToken = tokens[tokens.size() - 2];
 
+        // TODO: Read comment from under "Identifier Custom Rules"
         if (token.type == Token::Type::ASTERISK && prevToken.type == Token::Type::DATATYPE)
         {
             token.type = Token::Type::POINTER;
@@ -1114,6 +1115,7 @@ bool Lexer::TryParseIdentifier(std::vector<Token>& tokens, const char* buffer, l
         {
             Token& prevToken = tokens[tokens.size() - 2];
 
+            // TODO: Instead of defining datatype here, we should let it be an identifier and handle datatypes in the parser
             if (prevToken.type == Token::Type::DECLARATION || prevToken.type == Token::Type::DECLARATION_CONST || prevToken.type == Token::Type::RETURN_TYPE)
                 token.type = Token::Type::DATATYPE;
         }
