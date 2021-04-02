@@ -40,8 +40,7 @@ public:
         NUMERIC_DOUBLE,
         NUMERIC_HEX,
         STRING,
-        DATATYPE,
-        POINTER,
+        KEYWORD_IMPORT,
         KEYWORD_FUNCTION,
         KEYWORD_STRUCT,
         KEYWORD_ENUM,
@@ -63,27 +62,25 @@ public:
         ATTRIBUTE,
         UNINITIALIZED,
         DECLARATION_CONST,
+        RETURN_TYPE,
+        EQUALS,
         NOT_EQUALS,
-        MODULUS_EQUALS,
-        BITWISE_AND_EQUALS,
-        AND,
-        MULTIPLY_EQUALS,
+        LESS_THAN_EQUALS,
+        GREATER_THAN_EQUALS,
         PLUS_EQUALS,
         MINUS_EQUALS,
-        RETURN_TYPE,
+        MULTIPLY_EQUALS,
         DIVIDE_EQUALS,
-        LESS_THAN_EQUALS,
-        BITSHIFT_LEFT,
-        BITSHIFT_LEFT_EQUALS,
-        EQUALS,
-        GREATER_THAN_EQUALS,
-        BITSHIFT_RIGHT,
-        BITSHIFT_RIGHT_EQUALS,
+        MODULUS_EQUALS,
         POW_EQUALS,
+        BITSHIFT_LEFT_EQUALS,
+        BITSHIFT_RIGHT_EQUALS,
+        BITWISE_AND_EQUALS,
         BITWISE_OR_EQUALS,
+        BITSHIFT_LEFT,
+        BITSHIFT_RIGHT,
+        AND,
         OR,
-        INCREMENT,
-        DECREMENT,
 
         // Alias
         PARAM_SEPERATOR = COMMA,
@@ -97,7 +94,5 @@ public:
     uint16_t colNum = 0;
 
     std::string_view stringview;
-    
-    static std::string TypeToString(Type type);
-    static Type StringToType(std::string input);
+    uint32_t hash = 0;
 };

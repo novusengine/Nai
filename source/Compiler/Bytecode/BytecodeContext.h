@@ -1,6 +1,5 @@
 #pragma once
 #include <pch/Build.h>
-#include "NaiType.h"
 #include "ByteOpcode.h"
 #include "../../Utils/DynamicBytebuffer.h"
 

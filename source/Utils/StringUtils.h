@@ -47,9 +47,9 @@ namespace StringUtils
         return result;
     }
 
-    constexpr size_t hash_djb2(const char* str, int size)
+    constexpr uint32_t hash_djb2(const char* str, int size)
     {
-        size_t hash = 5381;
+        uint32_t hash = 5381;
 
         for (int i = 0; i < size; i++)
         {

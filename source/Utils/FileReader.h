@@ -41,6 +41,6 @@ private:
     std::string _path;
     std::string _fileName;
 
-    char* _buffer = nullptr;;
+    char* _buffer = nullptr;
     size_t _length = 0;
 };

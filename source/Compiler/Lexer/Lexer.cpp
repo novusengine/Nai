@@ -5,6 +5,7 @@
 #include "Lexer.h"
 #include "Utils/StringUtils.h"
 
+const char* KEYWORD_IMPORT = "import";
 const char* KEYWORD_FUNCTION = "fn";
 const char* KEYWORD_STRUCT = "struct";
 const char* KEYWORD_ENUM = "enum";
@@ -30,8 +31,16 @@ const char SPACE = ' ';
 const char STRING_SYMBOL = '"';
 const char ATTRIBUTE_SYMBOL = '#';
 
+const long singleCommentLen = strlen(KEYWORD_SINGLE_COMMENT);
+const long multiCommentLen = strlen(KEYWORD_MULTI_COMMENT_START);
+const long importLen = strlen(KEYWORD_IMPORT);
+const long functionLen = strlen(KEYWORD_FUNCTION);
+const long structLen = strlen(KEYWORD_STRUCT);
+const long enumLen = strlen(KEYWORD_ENUM);
+
 robin_hood::unordered_map<std::string_view, Token::Type> Lexer::_keywordStringToType =
 {
+    { KEYWORD_IMPORT, Token::Type::KEYWORD_IMPORT },
     { KEYWORD_FUNCTION, Token::Type::KEYWORD_FUNCTION },
     { KEYWORD_STRUCT, Token::Type::KEYWORD_STRUCT },
     { KEYWORD_ENUM, Token::Type::KEYWORD_ENUM },
@@ -65,16 +74,13 @@ bool Lexer::Process(ModuleInfo& moduleInfo)
 
 bool Lexer::GatherUnits(ModuleInfo& moduleInfo)
 {
-    moduleInfo.compileUnits.reserve(32);
-
-    const long singleCommentLen = strlen(KEYWORD_SINGLE_COMMENT);
-    const long multiCommentLen = strlen(KEYWORD_MULTI_COMMENT_START);
-    const long functionLen = strlen(KEYWORD_FUNCTION);
-    const long structLen = strlen(KEYWORD_STRUCT);
-    const long enumLen = strlen(KEYWORD_ENUM);
-
     int lineNum = 1;
     int colNum = 1;
+
+    const char* startAttributePtr = nullptr;
+    const char* endAttributePtr = nullptr;
+    int attributeLineNum = 1;
+    int attributeColNum = 1;
 
     for (long bufferPosition = 0; bufferPosition < moduleInfo.fileBufferSize;)
     {
@@ -82,24 +88,24 @@ bool Lexer::GatherUnits(ModuleInfo& moduleInfo)
         long remainingBufferSize = moduleInfo.fileBufferSize - bufferPosition;
 
         // Skip New Lines or White Spaces
-        if (character == NEWLINE || character == SPACE)
+        if (character == NEWLINE)
         {
-            if (character == NEWLINE)
-            {
-                lineNum += 1;
-                colNum = 1;
-            }
-            else
-            {
-                colNum += 1;
-            }
-
             bufferPosition++;
+            lineNum += 1;
+            colNum = 1;
+
+            continue;
+        }
+        else if (character == SPACE)
+        {
+            bufferPosition++;
+            colNum += 1;
+
             continue;
         }
 
         // Handle Comments Here
-        if (remainingBufferSize >= singleCommentLen && strncmp(&character, KEYWORD_SINGLE_COMMENT, singleCommentLen) == 0)
+        if (strncmp(&character, KEYWORD_SINGLE_COMMENT, singleCommentLen) == 0)
         {
             bufferPosition += singleCommentLen;
             colNum += singleCommentLen;
@@ -107,7 +113,7 @@ bool Lexer::GatherUnits(ModuleInfo& moduleInfo)
             SkipSingleComment(moduleInfo.fileBuffer, moduleInfo.fileBufferSize, bufferPosition, lineNum, colNum);
             continue;
         }
-        else if (remainingBufferSize >= multiCommentLen && strncmp(&character, KEYWORD_MULTI_COMMENT_START, multiCommentLen) == 0)
+        else if (strncmp(&character, KEYWORD_MULTI_COMMENT_START, multiCommentLen) == 0)
         {
             bufferPosition += multiCommentLen;
             colNum += singleCommentLen;
@@ -116,34 +122,68 @@ bool Lexer::GatherUnits(ModuleInfo& moduleInfo)
             continue;
         }
 
-        // Handle fns, structs and enums here
-        CompileUnit::Type type = CompileUnit::Type::NONE;
+        // Handle Import Definition
+        if (strncmp(&character, KEYWORD_IMPORT, importLen) == 0)
+        {
+            ModuleDefinition& definition = moduleInfo.definitions.emplace_back();
+            definition.type = ModuleDefinition::Type::IMPORT;
+            definition.startPtr = &character;
+            definition.startLineNum = lineNum;
+            definition.startColumnNum = colNum;
 
-        CompileUnit& unit = moduleInfo.compileUnits.emplace_back();
-        unit.type = type;
-        unit.startPtr = &character;
-        unit.startLineNum = lineNum;
-        unit.startColumnNum = colNum;
-        
+            for (; bufferPosition < moduleInfo.fileBufferSize; bufferPosition++)
+            {
+                const char& subCharacter = moduleInfo.fileBuffer[bufferPosition];
+
+                if (subCharacter == NEWLINE)
+                {
+                    lineNum += 1;
+                    colNum = 1;
+
+                    bufferPosition += 1;
+                    break;
+                }
+                else if (subCharacter == SPACE)
+                {
+                    colNum += 1;
+                    continue;
+                }
+            }
+
+            definition.endPtr = &moduleInfo.fileBuffer[bufferPosition - 1];
+            continue;
+        }
+
+        // Handle Attributes
         if (remainingBufferSize >= 1 && character == ATTRIBUTE_SYMBOL)
         {
+            if (startAttributePtr != nullptr && endAttributePtr != nullptr)
+            {
+                ReportError(5, "You may only define one set of attributes for an Enum, Struct or Function. (Line: %d, Col: %d)", lineNum, colNum);
+                return false;
+            }
+
+            startAttributePtr = &character;
+            attributeLineNum = lineNum;
+            attributeColNum = colNum;
+
             bufferPosition += 1;
             colNum += 1;
 
             char& openBracket = moduleInfo.fileBuffer[bufferPosition];
             if (openBracket != '[')
             {
-                ReportError(5, "Attributes must be encapsulated in []. (Line: %d, Col: %d)", lineNum, colNum);
+                ReportError(6, "Attributes must be encapsulated in []. (Line: %d, Col: %d)", lineNum, colNum);
+                return false;
             }
 
             bufferPosition += 1;
             bool closeBracketFound = false;
 
-            long subBufferPosition = bufferPosition;
-            for (; subBufferPosition < moduleInfo.fileBufferSize; subBufferPosition++)
+            for (; bufferPosition < moduleInfo.fileBufferSize; bufferPosition++)
             {
-                const char& subCharacter = moduleInfo.fileBuffer[subBufferPosition];
-                long remainingSubBufferSize = moduleInfo.fileBufferSize - subBufferPosition;
+                const char& subCharacter = moduleInfo.fileBuffer[bufferPosition];
+                long remainingSubBufferSize = moduleInfo.fileBufferSize - bufferPosition;
 
                 if (subCharacter == NEWLINE)
                 {
@@ -162,8 +202,7 @@ bool Lexer::GatherUnits(ModuleInfo& moduleInfo)
                 {
                     closeBracketFound = true;
 
-                    unit.endPtr = &subCharacter;
-                    subBufferPosition++;
+                    bufferPosition++;
                     break;
                 }
                 else if (remainingSubBufferSize >= functionLen && strncmp(&subCharacter, KEYWORD_FUNCTION, functionLen) == 0)
@@ -182,160 +221,63 @@ bool Lexer::GatherUnits(ModuleInfo& moduleInfo)
 
             if (!closeBracketFound)
             {
-                ReportError(6, "Failed to find closing bracket. (Line: %d, Col: %d)", lineNum, colNum);
+                ReportError(7, "Failed to find closing bracket. (Line: %d, Col: %d)", lineNum, colNum);
             }
 
-            // Skip Whitespaces / New Lines
-            {
-                for (; subBufferPosition < moduleInfo.fileBufferSize; subBufferPosition++)
-                {
-                    const char& subCharacter = moduleInfo.fileBuffer[subBufferPosition];
-
-                    if (subCharacter == NEWLINE)
-                    {
-                        lineNum += 1;
-                        colNum = 1;
-
-                        continue;
-                    }
-                    else if (subCharacter == SPACE)
-                    {
-                        colNum += 1;
-                        continue;
-                    }
-
-                    break;
-                }
-            }
-
-            bufferPosition = subBufferPosition;
+            endAttributePtr = &moduleInfo.fileBuffer[bufferPosition];
+            continue;
         }
-        
-        const char& keywordCharacter = moduleInfo.fileBuffer[bufferPosition];
-        if (remainingBufferSize >= functionLen && strncmp(&keywordCharacter, KEYWORD_FUNCTION, functionLen) == 0)
+
+        // Handle functions, structs and enums here
+        CompileUnit::Type unitType = CompileUnit::Type::NONE;
+
+        if (strncmp(&character, KEYWORD_FUNCTION, functionLen) == 0)
         {
-            unit.type = CompileUnit::Type::FUNCTION;
+            unitType = CompileUnit::Type::FUNCTION;
+            
             bufferPosition += functionLen;
             colNum += functionLen;
         }
-        else if (remainingBufferSize >= structLen && strncmp(&keywordCharacter, KEYWORD_STRUCT, structLen) == 0)
+        else if (strncmp(&character, KEYWORD_STRUCT, structLen) == 0)
         {
-            unit.type = CompileUnit::Type::STRUCT;
+            unitType = CompileUnit::Type::STRUCT;
+
             bufferPosition += structLen;
             colNum += structLen;
         }
-        else if (remainingBufferSize >= enumLen && strncmp(&keywordCharacter, KEYWORD_ENUM, enumLen) == 0)
+        else if (remainingBufferSize >= enumLen && strncmp(&character, KEYWORD_ENUM, enumLen) == 0)
         {
-            unit.type = CompileUnit::Type::ENUM;
+            unitType = CompileUnit::Type::ENUM;
+
             bufferPosition += enumLen;
             colNum += enumLen;
         }
+
+        if (unitType != CompileUnit::Type::NONE)
+        {
+            CompileUnit& unit = moduleInfo.compileUnits.emplace_back();
+            unit.moduleNameHash = moduleInfo.nameHash;
+            unit.type = unitType;
+            unit.startPtr = &character;
+            unit.startLineNum = lineNum;
+            unit.startColumnNum = colNum;
+
+            if (!GatherUnit(moduleInfo, unit, bufferPosition, lineNum, colNum))
+                return false;
+
+            if (startAttributePtr != nullptr && endAttributePtr != nullptr)
+            {
+                unit.startAttributePtr = startAttributePtr;
+                unit.endAttributePtr = endAttributePtr;
+
+                startAttributePtr = nullptr;
+                endAttributePtr = nullptr;
+            }
+        }
         else
         {
-            ReportError(1, "NAI is a pure language. This means you cannot have global data, you may define enums, structs or functions in your global scope. (Line: %d, Col: %d)", lineNum, colNum);
+            ReportError(1, "NAI is a pure language. This means you cannot have global data, you may define Module Name, Imports, Enums, Structs or Functions in the global scope. (Line: %d, Col: %d)", lineNum, colNum);
             return false;
-        }
-
-        // Gather Unit
-        {
-            long subBufferPosition = bufferPosition;
-            
-            long openBraceCount = 0;
-            bool openBraceFound = false;
-
-            int firstBraceLineNum = 0;
-            int firstBraceColNum = 0;
-
-            for (; subBufferPosition < moduleInfo.fileBufferSize; subBufferPosition++)
-            {
-                const char& subCharacter = moduleInfo.fileBuffer[subBufferPosition];
-                long remainingSubBufferSize = moduleInfo.fileBufferSize - subBufferPosition;
-
-                if (subCharacter == NEWLINE)
-                {
-                    lineNum += 1;
-                    colNum = 1;
-
-                    continue;
-                }
-                else if (subCharacter == SPACE)
-                {
-                    colNum += 1;
-                    continue;
-                }
-
-                if (subCharacter == '{')
-                {
-                    openBraceCount += 1;
-
-                    if (openBraceFound == false)
-                    {
-                        firstBraceLineNum = lineNum;
-                        firstBraceColNum = colNum;
-
-                        openBraceFound = true;
-                    }
-                }
-                else if (subCharacter == '}')
-                {
-                    if (openBraceFound == false)
-                    {
-                        ReportError(2, "Found closing brace without a matching opening brace. (Line: %d, Col: %d)", lineNum, colNum);
-                        return false;
-                    }
-
-                    if (--openBraceCount == 0)
-                    {
-                        unit.endPtr = &subCharacter;
-                        subBufferPosition++;
-                        break;
-                    }
-                }
-                else
-                {
-                    if (unit.type == CompileUnit::Type::FUNCTION || unit.type == CompileUnit::Type::ENUM)
-                    {
-                        if (remainingSubBufferSize >= functionLen && strncmp(&subCharacter, KEYWORD_FUNCTION, functionLen) == 0)
-                        {
-                            break;
-                        }
-                        else if (remainingSubBufferSize >= structLen && strncmp(&subCharacter, KEYWORD_STRUCT, structLen) == 0)
-                        {
-                            break;
-                        }
-                        else if (remainingSubBufferSize >= enumLen && strncmp(&subCharacter, KEYWORD_ENUM, enumLen) == 0)
-                        {
-                            break;
-                        }
-                    }
-                    else if (unit.type == CompileUnit::Type::STRUCT)
-                    {
-                        if (remainingSubBufferSize >= structLen && strncmp(&subCharacter, KEYWORD_STRUCT, structLen) == 0)
-                        {
-                            break;
-                        }
-                        else if (remainingSubBufferSize >= enumLen && strncmp(&subCharacter, KEYWORD_ENUM, enumLen) == 0)
-                        {
-                            break;
-                        }
-                    }
-                }
-
-                colNum += 1;
-            }
-
-            if (openBraceFound == false)
-            {
-                ReportError(3, "Failed to find opening and closing braces. (Line: %d, Col: %d)", lineNum, colNum);
-                return false;
-            }
-            else if (openBraceCount != 0)
-            {
-                ReportError(4, "Found opening brace without a matching closing brace. (Line: %d, Col: %d)", firstBraceLineNum, firstBraceColNum);
-                return false;
-            }
-
-            bufferPosition = subBufferPosition;
         }
     }
 
@@ -344,82 +286,32 @@ bool Lexer::GatherUnits(ModuleInfo& moduleInfo)
 
 bool Lexer::ProcessUnits(ModuleInfo& moduleInfo)
 {
+    std::for_each(std::execution::par, moduleInfo.definitions.begin(), moduleInfo.definitions.end(),
+        [](ModuleDefinition& moduleDefinition)
+        {
+            GatherTokens(moduleDefinition.startPtr, moduleDefinition.endPtr, moduleDefinition.tokens, moduleDefinition.startLineNum, moduleDefinition.startColumnNum);
+        });
+
     std::for_each(std::execution::par, moduleInfo.compileUnits.begin(), moduleInfo.compileUnits.end(),
         [](CompileUnit& unit)
         {
             unit.tokens.reserve(16384);
 
-            const long singleCommentLen = strlen(KEYWORD_SINGLE_COMMENT);
-            const long multiCommentLen = strlen(KEYWORD_MULTI_COMMENT_START);
-
-            int lineNum = unit.startLineNum;
-            int colNum = unit.startColumnNum;
-
-            long bufferStartPosition = 0;
-            long bufferSize = (unit.endPtr - unit.startPtr) + 1;
-
-            for (long bufferPosition = bufferStartPosition; bufferPosition < bufferSize;)
+            if (unit.startAttributePtr != nullptr && unit.endAttributePtr != nullptr)
             {
-                const char& character = unit.startPtr[bufferPosition];
-                long remainingBytes = bufferSize - bufferPosition;
-
-                // Skip New Lines or White Spaces
-                if (character == NEWLINE || character == SPACE)
-                {
-                    if (character == NEWLINE)
-                    {
-                        lineNum += 1;
-                        colNum = 1;
-                    }
-                    else
-                    {
-                        colNum += 1;
-                    }
-
-                    bufferPosition += 1;
-                    continue;
-                }
-
-                // Handle Comments Here
-                if (remainingBytes >= singleCommentLen && strncmp(&character, KEYWORD_SINGLE_COMMENT, singleCommentLen) == 0)
-                {
-                    bufferPosition += singleCommentLen;
-                    colNum += singleCommentLen;
-
-                    SkipSingleComment(unit.startPtr, bufferSize, bufferPosition, lineNum, colNum);
-                    continue;
-                }
-                else if (remainingBytes >= multiCommentLen && strncmp(&character, KEYWORD_MULTI_COMMENT_START, multiCommentLen) == 0)
-                {
-                    bufferPosition += multiCommentLen;
-                    colNum += singleCommentLen;
-
-                    SkipMultiComment(unit.startPtr, bufferSize, bufferPosition, lineNum, colNum);
-                    continue;
-                }
-
-                if (TryParseNumeric(unit.tokens, unit.startPtr, bufferSize, bufferPosition, lineNum, colNum))
-                    continue;
-
-                if (TryParseString(unit.tokens, unit.startPtr, bufferSize, bufferPosition, lineNum, colNum))
-                    continue;
-
-                if (TryParseSpecialToken(unit.tokens, unit.startPtr, bufferSize, bufferPosition, lineNum, colNum))
-                    continue;
-
-                if (TryParseIdentifier(unit.tokens, unit.startPtr, bufferSize, bufferPosition, lineNum, colNum))
-                    continue;
-
-                // We should never reach this
-                ReportError(7, "Failed to Analyse Character Sequence");
-                break;
+                unit.attributeTokens.reserve(128);
+                GatherTokens(unit.startAttributePtr, unit.endAttributePtr, unit.attributeTokens, unit.startAttributeLineNum, unit.startAttributeColumnNum);
             }
+
+            GatherTokens(unit.startPtr, unit.endPtr, unit.tokens, unit.startLineNum, unit.startColumnNum);
 
             int numTokens = static_cast<int>(unit.tokens.size());
             for (int i = 0; i < numTokens; i++)
             {
                 const Token& token = unit.tokens[i];
-                if (token.type == Token::Type::KEYWORD_FUNCTION)
+                if (token.type == Token::Type::KEYWORD_FUNCTION ||
+                    token.type == Token::Type::KEYWORD_STRUCT   ||
+                    token.type == Token::Type::KEYWORD_ENUM)
                 {
                     if (i + 1 < numTokens)
                     {
@@ -431,6 +323,7 @@ bool Lexer::ProcessUnits(ModuleInfo& moduleInfo)
             }
         });
 
+    moduleInfo.moduleImports.reserve(moduleInfo.definitions.size());
     return true;
 }
 
@@ -463,11 +356,9 @@ void Lexer::SkipMultiComment(const char* buffer, long bufferSize, long& bufferPo
     const long multiCommentStartLen = strlen(KEYWORD_MULTI_COMMENT_START);
     const long multiCommentEndLen = strlen(KEYWORD_MULTI_COMMENT_START);
 
-    long subBufferPosition = bufferPosition;
-    for (; subBufferPosition < bufferSize;)
+    for (; bufferPosition < bufferSize;)
     {
-        const char& subCharacter = buffer[subBufferPosition];
-        long remainingSubBufferSize = bufferSize - subBufferPosition;
+        const char& subCharacter = buffer[bufferPosition];
 
         // Skip New Lines
         if (subCharacter == NEWLINE)
@@ -475,29 +366,195 @@ void Lexer::SkipMultiComment(const char* buffer, long bufferSize, long& bufferPo
             lineNum += 1;
             colNum = 1;
 
-            subBufferPosition += 1;
+            bufferPosition += 1;
         }
-        else if (remainingSubBufferSize >= multiCommentStartLen && strncmp(&subCharacter, KEYWORD_MULTI_COMMENT_START, multiCommentStartLen) == 0)
+        else if (strncmp(&subCharacter, KEYWORD_MULTI_COMMENT_START, multiCommentStartLen) == 0)
         {
-            subBufferPosition += multiCommentStartLen;
+            bufferPosition += multiCommentStartLen;
             colNum += multiCommentStartLen;
 
-            SkipMultiComment(buffer, bufferSize, subBufferPosition, lineNum, colNum);
+            SkipMultiComment(buffer, bufferSize, bufferPosition, lineNum, colNum);
         }
-        else if (remainingSubBufferSize >= multiCommentEndLen && strncmp(&subCharacter, KEYWORD_MULTI_COMMENT_END, multiCommentEndLen) == 0)
+        else if (strncmp(&subCharacter, KEYWORD_MULTI_COMMENT_END, multiCommentEndLen) == 0)
         {
-            subBufferPosition += multiCommentEndLen;
+            bufferPosition += multiCommentEndLen;
             colNum += multiCommentEndLen;
             break;
         }
         else
         {
             colNum += 1;
-            subBufferPosition += 1;
+            bufferPosition += 1;
         }
     }
+}
 
-    bufferPosition = subBufferPosition;
+bool Lexer::GatherUnit(ModuleInfo& moduleInfo, CompileUnit& unit, long& bufferPosition, int& lineNum, int& colNum)
+{
+    // Gather Unit
+    long openBraceCount = 0;
+    bool openBraceFound = false;
+
+    int firstBraceLineNum = 0;
+    int firstBraceColNum = 0;
+
+    for (; bufferPosition < moduleInfo.fileBufferSize; bufferPosition++)
+    {
+        const char& subCharacter = moduleInfo.fileBuffer[bufferPosition];
+        long remainingSubBufferSize = moduleInfo.fileBufferSize - bufferPosition;
+
+        if (subCharacter == NEWLINE)
+        {
+            lineNum += 1;
+            colNum = 1;
+
+            continue;
+        }
+        else if (subCharacter == SPACE)
+        {
+            colNum += 1;
+
+            continue;
+        }
+
+        if (subCharacter == '{')
+        {
+            openBraceCount += 1;
+
+            if (openBraceFound == false)
+            {
+                firstBraceLineNum = lineNum;
+                firstBraceColNum = colNum;
+
+                openBraceFound = true;
+            }
+        }
+        else if (subCharacter == '}')
+        {
+            if (openBraceFound == false)
+            {
+                ReportError(2, "Found closing brace without a matching opening brace. (Line: %d, Col: %d)", lineNum, colNum);
+                return false;
+            }
+
+            if (--openBraceCount == 0)
+            {
+                unit.endPtr = &subCharacter;
+                bufferPosition++;
+                break;
+            }
+        }
+        else
+        {
+            if (unit.type == CompileUnit::Type::FUNCTION || unit.type == CompileUnit::Type::ENUM)
+            {
+                if (remainingSubBufferSize >= functionLen && strncmp(&subCharacter, KEYWORD_FUNCTION, functionLen) == 0)
+                {
+                    break;
+                }
+                else if (remainingSubBufferSize >= structLen && strncmp(&subCharacter, KEYWORD_STRUCT, structLen) == 0)
+                {
+                    break;
+                }
+                else if (remainingSubBufferSize >= enumLen && strncmp(&subCharacter, KEYWORD_ENUM, enumLen) == 0)
+                {
+                    break;
+                }
+            }
+            else if (unit.type == CompileUnit::Type::STRUCT)
+            {
+                if (remainingSubBufferSize >= functionLen && strncmp(&subCharacter, KEYWORD_FUNCTION, functionLen) == 0)
+                {
+                    // Get Function within Struct
+                }
+                else if (remainingSubBufferSize >= structLen && strncmp(&subCharacter, KEYWORD_STRUCT, structLen) == 0)
+                {
+                    break;
+                }
+                else if (remainingSubBufferSize >= enumLen && strncmp(&subCharacter, KEYWORD_ENUM, enumLen) == 0)
+                {
+                    break;
+                }
+            }
+        }
+
+        colNum += 1;
+    }
+
+    if (openBraceFound == false)
+    {
+        ReportError(3, "Failed to find opening and closing braces. (Line: %d, Col: %d)", lineNum, colNum);
+        return false;
+    }
+    else if (openBraceCount != 0)
+    {
+        ReportError(4, "Found opening brace without a matching closing brace. (Line: %d, Col: %d)", firstBraceLineNum, firstBraceColNum);
+        return false;
+    }
+
+    return true;
+}
+void Lexer::GatherTokens(const char* startPtr, const char* endPtr, std::vector<Token>& tokens, int& lineNum, int& colNum)
+{
+    long bufferStartPosition = 0;
+    long bufferSize = (endPtr - startPtr) + 1;
+
+    for (long bufferPosition = bufferStartPosition; bufferPosition < bufferSize;)
+    {
+        const char& character = startPtr[bufferPosition];
+        long remainingBytes = bufferSize - bufferPosition;
+
+        // Skip New Lines or White Spaces
+        if (character == NEWLINE || character == SPACE)
+        {
+            if (character == NEWLINE)
+            {
+                lineNum += 1;
+                colNum = 1;
+            }
+            else
+            {
+                colNum += 1;
+            }
+
+            bufferPosition += 1;
+            continue;
+        }
+
+        // Handle Comments Here
+        if (remainingBytes >= singleCommentLen && strncmp(&character, KEYWORD_SINGLE_COMMENT, singleCommentLen) == 0)
+        {
+            bufferPosition += singleCommentLen;
+            colNum += singleCommentLen;
+
+            SkipSingleComment(startPtr, bufferSize, bufferPosition, lineNum, colNum);
+            continue;
+        }
+        else if (remainingBytes >= multiCommentLen && strncmp(&character, KEYWORD_MULTI_COMMENT_START, multiCommentLen) == 0)
+        {
+            bufferPosition += multiCommentLen;
+            colNum += singleCommentLen;
+
+            SkipMultiComment(startPtr, bufferSize, bufferPosition, lineNum, colNum);
+            continue;
+        }
+
+        if (TryParseNumeric(tokens, startPtr, bufferSize, bufferPosition, lineNum, colNum))
+            continue;
+
+        if (TryParseString(tokens, startPtr, bufferSize, bufferPosition, lineNum, colNum))
+            continue;
+
+        if (TryParseSpecialToken(tokens, startPtr, bufferSize, bufferPosition, lineNum, colNum))
+            continue;
+
+        if (TryParseIdentifier(tokens, startPtr, bufferSize, bufferPosition, lineNum, colNum))
+            continue;
+
+        // We should never reach this
+        ReportError(8, "Failed to Analyse Character Sequence");
+        break;
+    }
 }
 
 bool Lexer::TryParseNumeric(std::vector<Token>& tokens, const char* buffer, long bufferSize, long& bufferPosition, int& lineNum, int& colNum)
@@ -586,18 +643,27 @@ bool Lexer::TryParseNumeric(std::vector<Token>& tokens, const char* buffer, long
     }
     else
     {
-        if (uCount == 0)
+        if (fCount != 0)
         {
-            token.type = Token::Type::NUMERIC_SIGNED;
+            token.type = Token::Type::NUMERIC_FLOAT;
+            stringViewLength -= 1;
         }
         else
         {
-            token.type = Token::Type::NUMERIC_UNSIGNED;
-            stringViewLength -= 1;
+            if (uCount == 0)
+            {
+                token.type = Token::Type::NUMERIC_SIGNED;
+            }
+            else
+            {
+                token.type = Token::Type::NUMERIC_UNSIGNED;
+                stringViewLength -= 1;
+            }
         }
     }
 
     token.stringview = std::string_view(&character, stringViewLength);
+    token.hash = StringUtils::hash_djb2(token.stringview.data(), token.stringview.size());
     token.lineNum = lineNum;
     token.colNum = colNum;
 
@@ -638,6 +704,7 @@ bool Lexer::TryParseString(std::vector<Token>& tokens, const char* buffer, long 
 
     token.type = Token::Type::STRING;
     token.stringview = std::string_view(&character + 1, length - 1);
+    token.hash = StringUtils::hash_djb2(token.stringview.data(), token.stringview.size());
     token.lineNum = lineNum;
     token.colNum = colNum;
 
@@ -758,13 +825,6 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
                     specialCharacterLength += 1;
                     break;
                 }
-
-                case '+':
-                {
-                    type = Token::Type::INCREMENT;
-                    specialCharacterLength += 1;
-                    break;
-                }
             }
 
             break;
@@ -798,14 +858,11 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
 
                 case '-':
                 {
-                    type = Token::Type::DECREMENT;
-                    specialCharacterLength += 1;
-
                     switch (*character)
                     {
                         case '-':
                             type = Token::Type::UNINITIALIZED;
-                            specialCharacterLength += 1;
+                            specialCharacterLength += 2;
                             break;
                     }
                     break;
@@ -1039,20 +1096,9 @@ bool Lexer::TryParseSpecialToken(std::vector<Token>& tokens, const char* buffer,
     Token& token = tokens.emplace_back();
     token.type = type;
     token.stringview = std::string_view(&buffer[bufferPosition], specialCharacterLength);
+    token.hash = StringUtils::hash_djb2(token.stringview.data(), token.stringview.size());
     token.lineNum = lineNum;
     token.colNum = colNum;
-
-    // Custom Rules
-    if (tokens.size() > 1)
-    {
-        Token& prevToken = tokens[tokens.size() - 2];
-
-        // TODO: Read comment from under "Identifier Custom Rules"
-        if (token.type == Token::Type::ASTERISK && prevToken.type == Token::Type::DATATYPE)
-        {
-            token.type = Token::Type::POINTER;
-        }
-    }
 
     bufferPosition += specialCharacterLength;
     colNum += specialCharacterLength;
@@ -1074,7 +1120,7 @@ bool Lexer::TryParseIdentifier(std::vector<Token>& tokens, const char* buffer, l
         if (subCharacter == NEWLINE || subCharacter == SPACE)
             break;
 
-        if (!isalpha(subCharacter) && !isdigit(subCharacter))
+        if (subCharacter != '_' && !isalpha(subCharacter) && !isdigit(subCharacter))
             break;
     }
 
@@ -1083,6 +1129,7 @@ bool Lexer::TryParseIdentifier(std::vector<Token>& tokens, const char* buffer, l
     Token& token = tokens.emplace_back();
     token.type = Token::Type::IDENTIFIER;
     token.stringview = std::string_view(&character, length);
+    token.hash = StringUtils::hash_djb2(token.stringview.data(), token.stringview.size());
     token.lineNum = lineNum;
     token.colNum = colNum;
 
@@ -1103,21 +1150,10 @@ bool Lexer::TryParseIdentifier(std::vector<Token>& tokens, const char* buffer, l
 
                 size_t newLength = (token.stringview.data() + length) - prevToken.stringview.data();
                 prevToken.stringview = std::string_view(prevToken.stringview.data(), newLength);
+                prevToken.hash = StringUtils::hash_djb2(token.stringview.data(), token.stringview.size());
 
                 tokens.pop_back();
             }
-        }
-    }
-    else
-    {
-        // Identifier Custom Rules
-        if (tokens.size() > 1)
-        {
-            Token& prevToken = tokens[tokens.size() - 2];
-
-            // TODO: Instead of defining datatype here, we should let it be an identifier and handle datatypes in the parser
-            if (prevToken.type == Token::Type::DECLARATION || prevToken.type == Token::Type::DECLARATION_CONST || prevToken.type == Token::Type::RETURN_TYPE)
-                token.type = Token::Type::DATATYPE;
         }
     }
 

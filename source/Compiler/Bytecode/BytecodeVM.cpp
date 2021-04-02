@@ -39,8 +39,18 @@ bool BytecodeVM::RunScript(fs::path filePath)
         NC_LOG_ERROR("RunScript: Attempt to run non-existing script (%s)", filePathStr.c_str());
         return false;
     }
+
+    _compiler.Start();
+    _compiler.AddIncludePath({ "D:\\Development\\Nai\\bin\\DebugClang\\basic" });
+    _compiler.AddPaths({ filePath });
+    _compiler.Process();
+
+    while (_compiler.GetStage() != Compiler::Stage::STOPPED)
+    {
+        std::this_thread::yield();
+    }
     
-    FileReader reader(filePathStr, filePath.filename().string());
+    /*FileReader reader(filePathStr, filePath.filename().string());
     if (!reader.Fetch())
     {
         NC_LOG_ERROR("RunScript: Failed to read script (%s)", filePath.c_str());
@@ -52,7 +62,7 @@ bool BytecodeVM::RunScript(fs::path filePath)
     {
         _modules.pop_back();
         return false;
-    }
+    }*/
 
     //size_t mainFnNameHash = StringUtils::hash_djb2("main", 4);
     //if (!Run(moduleInfo, mainFnNameHash))
@@ -72,8 +82,8 @@ bool BytecodeVM::Compile(FileReader& reader, ModuleInfo& moduleInfo)
     if (!Lexer::Process(moduleInfo))
         return false;
 
-    if (!Parser::Process(moduleInfo))
-        return false;
+    /*if (!Parser::Process(moduleInfo))
+        return false;*/
 
     std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> time_span = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1);

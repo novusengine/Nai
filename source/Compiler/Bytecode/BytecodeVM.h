@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <Utils/FileReader.h>
 
+#include "../Compiler.h"
 #include "../ModuleInfo.h"
 #include "../Lexer/Lexer.h"
 #include "../Parser/Parser.h"
@@ -34,9 +35,9 @@ private:
     bool Run(ModuleInfo& moduleInfo, size_t fnNameHash);
 
 private:
+    Compiler _compiler;
     std::atomic<uint16_t> _contextIndex = 0; // Round Robin when we handle GetContext
     std::vector<BytecodeContext> _contexts;
-    std::vector<ModuleInfo> _modules;
 
     BytecodeGenerator _bytecodeGenerater;
 };
