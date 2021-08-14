@@ -23,20 +23,10 @@
 */
 #pragma once
 #include <pch/Build.h>
+#pragma once
 
-#if defined(_WIN32)
-#include <Windows.h>
-#endif
 #include <string>
-#include <cassert>
-
-enum PROGRAM_TYPE
-{
-    Auth,
-    Relay,
-    Char,
-    World
-};
+#include "Types.h"
 
 enum ColorCode
 {
@@ -46,67 +36,45 @@ enum ColorCode
     RED = 12,
 };
 
-#define NC_LOG_MESSAGE(message, ...)  \
-    if (!DebugHandler::isInitialized) \
-    {                                 \
-        DebugHandler::Initialize();   \
-    }                                 \
-    DebugHandler::Print(message, ##__VA_ARGS__);
-
-#define NC_LOG_WARNING(message, ...)  \
-    if (!DebugHandler::isInitialized) \
-    {                                 \
-        DebugHandler::Initialize();   \
-    }                                 \
-    DebugHandler::PrintWarning(message, ##__VA_ARGS__);
-
-#define NC_LOG_DEPRECATED(message, ...) \
-    if (!DebugHandler::isInitialized)   \
-    {                                   \
-        DebugHandler::Initialize();     \
-    }                                   \
-    DebugHandler::PrintDeprecated(message, ##__VA_ARGS__);
-
-#define NC_LOG_ERROR(message, ...)    \
-    if (!DebugHandler::isInitialized) \
-    {                                 \
-        DebugHandler::Initialize();   \
-    }                                 \
-    DebugHandler::PrintError(message, ##__VA_ARGS__);
-
-#define NC_LOG_FATAL(message, ...)    \
-    if (!DebugHandler::isInitialized) \
-    {                                 \
-        DebugHandler::Initialize();   \
-    }                                 \
-    DebugHandler::PrintFatal(message, ##__VA_ARGS__);
-
-#define NC_LOG_SUCCESS(message, ...)  \
-    if (!DebugHandler::isInitialized) \
-    {                                 \
-        DebugHandler::Initialize();   \
-    }                                 \
-    DebugHandler::PrintSuccess(message, ##__VA_ARGS__);
-
 #if defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-security"
 #endif
+struct IDebugHandlerData {};
+
 class DebugHandler
 {
 public:
-    static bool isInitialized;
-    static void Initialize();
-
     template <typename... Args>
     inline static void Print(std::string message, Args... args)
     {
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
+
         printf((message + "\n").c_str(), args...);
+    }
+    
+    template <typename... Args>
+    inline static void Print_NoNewLine(std::string message, Args... args)
+    {
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
+
+        printf((message).c_str(), args...);
     }
 
     template <typename... Args>
     inline static void PrintWarning(std::string message, Args... args)
     {
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
+
         PrintColor("[Warning]: ", ColorCode::YELLOW);
         Print(message, args...);
     }
@@ -114,6 +82,11 @@ public:
     template <typename... Args>
     inline static void PrintDeprecated(std::string message, Args... args)
     {
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
+
         PrintColor("[Deprecated]: ", ColorCode::YELLOW);
         Print(message, args...);
     }
@@ -121,6 +94,11 @@ public:
     template <typename... Args>
     inline static void PrintError(std::string message, Args... args)
     {
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
+
         PrintColor("[Error]: ", ColorCode::MAGENTA);
         Print(message, args...);
     }
@@ -128,6 +106,11 @@ public:
     template <typename... Args>
     inline static void PrintFatal(std::string message, Args... args)
     {
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
+
         PrintColor("[Fatal]: ", ColorCode::RED);
         Print(message, args...);
         assert(false);
@@ -136,52 +119,37 @@ public:
     template <typename... Args>
     inline static void PrintSuccess(std::string message, Args... args)
     {
+        if (!_isInitialized)
+        {
+            Initialize();
+        }
+
         PrintColor("[Success]: ", ColorCode::GREEN);
         Print(message, args...);
     }
 
-private:
     template <typename... Args>
     inline static void PrintColor(std::string message, ColorCode color, Args... args)
     {
-#ifdef _WIN32
-        SetConsoleTextAttribute(_handle, static_cast<WORD>(color));
-        printf(message.c_str(), args...);
-        SetConsoleTextAttribute(_handle, static_cast<WORD>(_defaultColor));
-#else
-        const std::string green("\033[1;32m");
-        const std::string yellow("\033[1;33m");
-        const std::string magenta("\033[0;35m");
-        const std::string red("\033[0;31m");
-        const std::string reset("\033[0m");
-
-        std::string withColors;
-        switch (color)
+        if (!_isInitialized)
         {
-        case ColorCode::RED:
-            withColors = red + message + reset;
-            break;
-        case ColorCode::YELLOW:
-            withColors = yellow + message + reset;
-            break;
-        case ColorCode::MAGENTA:
-            withColors = magenta + message + reset;
-            break;
-        case ColorCode::GREEN:
-            withColors = green + message + reset;
-            break;
-        default:
-            withColors = message;
+            Initialize();
         }
 
-        Print(withColors, args...);
-#endif
+        PushColor(color);
+        printf(message.c_str(), args...);
+        PopColor();
     }
 
-#ifdef _WIN32
-    static uint32_t _defaultColor;
-    static HANDLE _handle;
-#endif
+private:
+    static void Initialize();
+
+    static void PushColor(ColorCode color);
+    static void PopColor();
+
+private:
+    static bool _isInitialized;
+    static IDebugHandlerData* _data;
 };
 #if defined(__clang__)
 #pragma GCC diagnostic pop

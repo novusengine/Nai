@@ -33,18 +33,17 @@ project (PROJECT_NAME)
     postbuildcommands { "rmdir /Q /S %{OUTPUT_BASE_PATH}\\testresults" }
 
     files { "source/**.h", "source/**.hpp", "source/**.cpp", "dep/tracy/TracyClient.cpp" }
-    flags { "MultiProcessorCompile" }
     
     filter "configurations:Debug"
         defines { "NAI_DEBUG=1", "NAI_RELEASE=0", "NAI_CLANG=0" }
-        flags { "FatalWarnings" }
+        flags { "FatalWarnings", "MultiProcessorCompile" }
         symbols "On"
         targetsuffix ("_Debug")
         targetdir "bin/Debug"
 
     filter "configurations:Release"
         defines { "NAI_DEBUG=0", "NAI_RELEASE=1", "NAI_CLANG=0" }
-        flags { "FatalWarnings" }
+        flags { "FatalWarnings", "MultiProcessorCompile" }
         targetsuffix ("_Release")
         symbols "Off"
         optimize "On"

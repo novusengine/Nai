@@ -1,98 +1,79 @@
 #pragma once
-#include <pch/Build.h>
-#include <string>
+#include "pch/Build.h"
+#include "Utils/StringUtils.h"
+#include "Utils/NameHash.h"
 
-class Token
+struct Token
 {
 public:
-    enum class Type : uint16_t
+    enum class Kind
     {
-        EXCLAMATION_MARK = 33,
-        PERCENT = 37,
-        AMPERSAND = 38,
-        LPAREN = 40,
-        RPAREN = 41,
-        ASTERISK = 42,
-        PLUS = 43,
-        COMMA = 44,
-        MINUS = 45,
-        PERIOD = 46,
-        SLASH = 47,
-        DECLARATION = 58,
-        SEMICOLON = 59,
-        LESS_THAN = 60,
-        ASSIGN = 61,
-        GREATER_THAN = 62,
-        QUESTION_MARK = 63,
-        LBRACKET = 91,
-        BACKSLASH = 92,
-        RBRACKET = 93,
-        CARET = 94,
-        LBRACE = 123,
-        PIPE = 124,
-        RBRACE = 125,
-        TILDE = 126,
+        None,
+        End_of_File,
 
-        IDENTIFIER = 256,
-        NUMERIC_SIGNED,
-        NUMERIC_UNSIGNED,
-        NUMERIC_FLOAT,
-        NUMERIC_DOUBLE,
-        NUMERIC_HEX,
-        STRING,
-        KEYWORD_IMPORT,
-        KEYWORD_FUNCTION,
-        KEYWORD_STRUCT,
-        KEYWORD_ENUM,
-        KEYWORD_BREAK,
-        KEYWORD_CONTINUE,
-        KEYWORD_RETURN,
-        KEYWORD_WHILE,
-        KEYWORD_IF,
-        KEYWORD_ELSEIF,
-        KEYWORD_ELSE,
-        KEYWORD_FOR,
-        KEYWORD_FOREACH,
-        KEYWORD_IN,
-        KEYWORD_TRUE,
-        KEYWORD_FALSE,
-        KEYWORD_NULLPTR,
+        Parenthesis_Open,
+        Parenthesis_Close,
+        Bracket_Open,
+        Bracket_Close,
+        Curley_Bracket_Open,
+        Curley_Bracket_Close,
+        Semicolon,
+        Colon,
+        DoubleColon,
+        Comma,
+        Dot,
+        Arrow,
+        Hashtag,
 
-        // Custom Special/Operator Types
-        ATTRIBUTE,
-        UNINITIALIZED,
-        DECLARATION_CONST,
-        RETURN_TYPE,
-        EQUALS,
-        NOT_EQUALS,
-        LESS_THAN_EQUALS,
-        GREATER_THAN_EQUALS,
-        PLUS_EQUALS,
-        MINUS_EQUALS,
-        MULTIPLY_EQUALS,
-        DIVIDE_EQUALS,
-        MODULUS_EQUALS,
-        POW_EQUALS,
-        BITSHIFT_LEFT_EQUALS,
-        BITSHIFT_RIGHT_EQUALS,
-        BITWISE_AND_EQUALS,
-        BITWISE_OR_EQUALS,
-        BITSHIFT_LEFT,
-        BITSHIFT_RIGHT,
-        AND,
-        OR,
+        Identifier,
+        String,
+        Number,
+        Comment,
 
-        // Alias
-        PARAM_SEPERATOR = COMMA,
-        END_OF_LINE = SEMICOLON,
+        Op_Add,
+        Op_Subtract,
+        Op_Multiply,
+        Op_Divide,
+        Op_Modulo,
+        Op_Assign,
+        Op_LessThan,
+        Op_LessEqual,
+        Op_GreaterThan,
+        Op_GreaterEqual,
+        Op_Equal,
+        Op_NotEqual,
+        Op_Bitwise_And,
+        Op_And,
+        Op_Bitwise_Or,
+        Op_Or,
+        Op_At,
 
-        NONE = 999
+        Keyword_Struct,
+        Keyword_Union,
+        Keyword_Enum,
+        Keyword_Fn,
+        Keyword_If,
+        Keyword_Else,
+        Keyword_Loop,
+        Keyword_Continue,
+        Keyword_Break,
+        Keyword_New,
+        Keyword_Free,
+        Keyword_Return
     };
 
-    Type type = Type::NONE;
-    uint32_t lineNum = 0;
-    uint16_t colNum = 0;
+    Kind kind = Kind::None;
 
-    std::string_view stringview;
-    uint32_t hash = 0;
+    NameHashView nameHash;
+
+    u32 line = std::numeric_limits<u32>().max();
+    u32 column = std::numeric_limits<u32>().max();
+
+    u64 number;
+
+    bool ExternalToken()
+    {
+        return line == std::numeric_limits<u32>().max() || column == std::numeric_limits<u32>().max();
+    }
+    static const char* GetTokenKindName(Kind kind);
 };

@@ -23,7 +23,7 @@ public:
         if (!_buffer)
             return false;
 
-        _length = fread(_buffer, 1, size, _fileStream);;
+        _length = fread(_buffer, 1, size, _fileStream);
 
         fclose(_fileStream);
         return true;

@@ -19,6 +19,20 @@ namespace StringUtils
 
         return results;
     }
+    
+    template <typename... Args>
+    inline i32 FormatString(char* buffer, size_t bufferSize, char const* format, Args... args)
+    {
+        i32 length = -1;
+    #ifdef _WIN32
+        length = sprintf_s(buffer, bufferSize, format, args...);
+    #else
+        (void)bufferSize; // Get rid of warning
+        length = sprintf(buffer, format, args...);
+    #endif
+        assert(length > -1);
+        return length;
+    }
 
     inline std::vector<std::wstring> Split(std::wstring string, wchar_t delim = L' ')
     {
